@@ -103,51 +103,62 @@
   .sv .mono{font-family:var(--mono)}
   .sv .sans{font-family:var(--sans)}
   .sv .body{font-family:var(--body)}
-  .sv .anim{animation-duration:16s; animation-timing-function:ease-in-out; animation-iteration-count:infinite}
+  .sv .anim{animation-duration:20s; animation-timing-function:ease-in-out; animation-iteration-count:infinite}
   .sv .beam, .sv .ring, .sv .scan, .sv .hl, .sv .row{opacity:0}
   .sv .pupil, .sv .lid{transform-box:fill-box; transform-origin:center}
 
+  /* four looks: source code, logs, metrics, telemetry */
   #beam1, #ring1{animation-name:look1}
   #beam2, #ring2{animation-name:look2}
   #beam3, #ring3{animation-name:look3}
-  @keyframes look1{0%,2%{opacity:0} 5%,27%{opacity:1} 30%,100%{opacity:0}}
-  @keyframes look2{0%,32%{opacity:0} 35%,57%{opacity:1} 60%,100%{opacity:0}}
-  @keyframes look3{0%,62%{opacity:0} 65%,87%{opacity:1} 90%,100%{opacity:0}}
+  #beam4, #ring4{animation-name:look4}
+  @keyframes look1{0%,2%{opacity:0} 4%,20%{opacity:1} 23%,100%{opacity:0}}
+  @keyframes look2{0%,24%{opacity:0} 26%,42%{opacity:1} 45%,100%{opacity:0}}
+  @keyframes look3{0%,46%{opacity:0} 48%,64%{opacity:1} 67%,100%{opacity:0}}
+  @keyframes look4{0%,68%{opacity:0} 70%,86%{opacity:1} 89%,100%{opacity:0}}
 
   #scan1{animation-name:scan1}
   #scan2{animation-name:scan2}
   #scan3{animation-name:scan3}
-  @keyframes scan1{0%,4%{opacity:0; transform:translateY(0)} 6%{opacity:1; transform:translateY(0)} 24%{opacity:1; transform:translateY(98px)} 26%,100%{opacity:0; transform:translateY(98px)}}
-  @keyframes scan2{0%,34%{opacity:0; transform:translateY(0)} 36%{opacity:1; transform:translateY(0)} 54%{opacity:1; transform:translateY(98px)} 56%,100%{opacity:0; transform:translateY(98px)}}
-  @keyframes scan3{0%,64%{opacity:0; transform:translateX(0)} 66%{opacity:1; transform:translateX(0)} 82%{opacity:1; transform:translateX(188px)} 85%,100%{opacity:0; transform:translateX(188px)}}
+  #scan4{animation-name:scan4}
+  @keyframes scan1{0%,3%{opacity:0; transform:translateY(0)} 5%{opacity:1; transform:translateY(0)} 19%{opacity:1; transform:translateY(86px)} 21%,100%{opacity:0; transform:translateY(86px)}}
+  @keyframes scan2{0%,25%{opacity:0; transform:translateY(0)} 27%{opacity:1; transform:translateY(0)} 41%{opacity:1; transform:translateY(86px)} 43%,100%{opacity:0; transform:translateY(86px)}}
+  @keyframes scan3{0%,47%{opacity:0; transform:translateX(0)} 49%{opacity:1; transform:translateX(0)} 63%{opacity:1; transform:translateX(134px)} 65%,100%{opacity:0; transform:translateX(134px)}}
+  @keyframes scan4{0%,69%{opacity:0; transform:translateY(0)} 71%{opacity:1; transform:translateY(0)} 85%{opacity:1; transform:translateY(86px)} 87%,100%{opacity:0; transform:translateY(86px)}}
 
   #hl1{animation-name:hl1}
   #hl2{animation-name:hl2}
   #hl3{animation-name:hl3}
-  @keyframes hl1{0%,16%{opacity:0} 19%,95%{opacity:1} 98%,100%{opacity:0}}
-  @keyframes hl2{0%,46%{opacity:0} 49%,95%{opacity:1} 98%,100%{opacity:0}}
-  @keyframes hl3{0%,76%{opacity:0} 79%,95%{opacity:1} 98%,100%{opacity:0}}
+  #hl4{animation-name:hl4}
+  @keyframes hl1{0%,12%{opacity:0} 15%,95%{opacity:1} 98%,100%{opacity:0}}
+  @keyframes hl2{0%,34%{opacity:0} 37%,95%{opacity:1} 98%,100%{opacity:0}}
+  @keyframes hl3{0%,56%{opacity:0} 59%,95%{opacity:1} 98%,100%{opacity:0}}
+  @keyframes hl4{0%,78%{opacity:0} 81%,95%{opacity:1} 98%,100%{opacity:0}}
 
   #row1{animation-name:row1}
   #row2{animation-name:row2}
   #row3{animation-name:row3}
-  @keyframes row1{0%,24%{opacity:0; transform:translateX(10px)} 27%,95%{opacity:1; transform:translateX(0)} 98%,100%{opacity:0; transform:translateX(0)}}
-  @keyframes row2{0%,54%{opacity:0; transform:translateX(10px)} 57%,95%{opacity:1; transform:translateX(0)} 98%,100%{opacity:0; transform:translateX(0)}}
-  @keyframes row3{0%,84%{opacity:0; transform:translateX(10px)} 87%,95%{opacity:1; transform:translateX(0)} 98%,100%{opacity:0; transform:translateX(0)}}
+  #row2b{animation-name:row2b}
+  @keyframes row1{0%,18%{opacity:0; transform:translateX(10px)} 21%,95%{opacity:1; transform:translateX(0)} 98%,100%{opacity:0; transform:translateX(0)}}
+  @keyframes row2{0%,40%{opacity:0; transform:translateX(10px)} 43%,95%{opacity:1; transform:translateX(0)} 98%,100%{opacity:0; transform:translateX(0)}}
+  @keyframes row3{0%,62%{opacity:0; transform:translateX(10px)} 65%,95%{opacity:1; transform:translateX(0)} 98%,100%{opacity:0; transform:translateX(0)}}
+  @keyframes row2b{0%,84%{opacity:0; transform:translateX(10px)} 87%,95%{opacity:1; transform:translateX(0)} 98%,100%{opacity:0; transform:translateX(0)}}
 
   .sv .pupil{animation-name:gaze}
   @keyframes gaze{
     0%{transform:translate(0,0)}
-    3%,28%{transform:translate(-2px,-9px)}
-    33%,58%{transform:translate(5px,-8px)}
-    63%,88%{transform:translate(9px,-5px)}
-    92%,96%{transform:translate(9px,3px)}
+    3%,21%{transform:translate(-3px,-9px)}
+    25%,43%{transform:translate(3px,-9px)}
+    47%,65%{transform:translate(7px,-7px)}
+    69%,87%{transform:translate(9px,-5px)}
+    91%,96%{transform:translate(9px,3px)}
     100%{transform:translate(0,0)}
   }
   .sv .lid{animation-name:blink}
   @keyframes blink{
-    0%,29.4%{transform:scaleY(1)} 30.2%{transform:scaleY(.08)} 31%,59.4%{transform:scaleY(1)}
-    60.2%{transform:scaleY(.08)} 61%,89.4%{transform:scaleY(1)} 90.2%{transform:scaleY(.08)} 91%,100%{transform:scaleY(1)}
+    0%,22.4%{transform:scaleY(1)} 23.2%{transform:scaleY(.08)} 24%,44.4%{transform:scaleY(1)}
+    45.2%{transform:scaleY(.08)} 46%,66.4%{transform:scaleY(1)} 67.2%{transform:scaleY(.08)} 68%,88.4%{transform:scaleY(1)}
+    89.2%{transform:scaleY(.08)} 90%,100%{transform:scaleY(1)}
   }
   .sv .live{animation:live 2s ease-in-out infinite}
   @keyframes live{0%,100%{opacity:1} 50%{opacity:.25}}
@@ -166,7 +177,7 @@
   .intro{font-size:16.5px; line-height:1.6; color:var(--ink-2); margin:0 0 22px; max-width:62ch}
 
   /* ---- what Senti looks at ---- */
-  .looks{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--rule); border:1px solid var(--rule)}
+  .looks{display:grid; grid-template-columns:repeat(2,1fr); gap:1px; background:var(--rule); border:1px solid var(--rule)}
   @media (max-width:700px){ .looks{grid-template-columns:1fr} }
   .look{background:var(--surface); padding:22px 20px 24px}
   .look .num{font-family:var(--mono); font-size:11.5px; letter-spacing:.13em; color:var(--accent); margin:0 0 10px}
@@ -229,113 +240,158 @@
 
     <figure class="watch">
       <svg class="sv" viewBox="0 0 760 430" role="img" aria-labelledby="sv-title">
-        <title id="sv-title">Senti looks at the source code, then the logs, then the metrics and telemetry, and adds one finding from each to a short digest.</title>
+        <title id="sv-title">Senti looks at your source code, logs,
+metrics and telemetry, and suggests
+the few fixes that matter most.</title>
         <defs>
-          <linearGradient id="g1" gradientUnits="userSpaceOnUse" x1="150" y1="290" x2="128" y2="166">
+          <linearGradient id="g1" gradientUnits="userSpaceOnUse" x1="150" y1="290" x2="104" y2="166">
             <stop offset="0" stop-color="#4FC4F4" stop-opacity=".5"/><stop offset="1" stop-color="#4FC4F4" stop-opacity=".06"/>
           </linearGradient>
-          <linearGradient id="g2" gradientUnits="userSpaceOnUse" x1="150" y1="290" x2="380" y2="166">
+          <linearGradient id="g2" gradientUnits="userSpaceOnUse" x1="150" y1="290" x2="288" y2="166">
             <stop offset="0" stop-color="#4FC4F4" stop-opacity=".5"/><stop offset="1" stop-color="#4FC4F4" stop-opacity=".06"/>
           </linearGradient>
-          <linearGradient id="g3" gradientUnits="userSpaceOnUse" x1="150" y1="290" x2="632" y2="166">
+          <linearGradient id="g3" gradientUnits="userSpaceOnUse" x1="150" y1="290" x2="472" y2="166">
             <stop offset="0" stop-color="#4FC4F4" stop-opacity=".5"/><stop offset="1" stop-color="#4FC4F4" stop-opacity=".06"/>
           </linearGradient>
-          <clipPath id="c1"><rect x="16" y="16" width="224" height="150" rx="6"/></clipPath>
-          <clipPath id="c2"><rect x="268" y="16" width="224" height="150" rx="6"/></clipPath>
-          <clipPath id="c3"><rect x="520" y="16" width="224" height="150" rx="6"/></clipPath>
+          <linearGradient id="g4" gradientUnits="userSpaceOnUse" x1="150" y1="290" x2="656" y2="166">
+            <stop offset="0" stop-color="#4FC4F4" stop-opacity=".5"/><stop offset="1" stop-color="#4FC4F4" stop-opacity=".06"/>
+          </linearGradient>
+          <clipPath id="c1"><rect x="16" y="16" width="176" height="150" rx="6"/></clipPath>
+          <clipPath id="c2"><rect x="200" y="16" width="176" height="150" rx="6"/></clipPath>
+          <clipPath id="c3"><rect x="384" y="16" width="176" height="150" rx="6"/></clipPath>
+          <clipPath id="c4"><rect x="568" y="16" width="176" height="150" rx="6"/></clipPath>
         </defs>
 
         <!-- beams from Senti's eye to each panel -->
-        <polygon id="beam1" class="beam anim" points="150,290 40,166 216,166" fill="url(#g1)"/>
-        <polygon id="beam2" class="beam anim" points="150,290 292,166 468,166" fill="url(#g2)"/>
-        <polygon id="beam3" class="beam anim" points="150,290 544,166 720,166" fill="url(#g3)"/>
+        <polygon id="beam1" class="beam anim" points="150,290 36,166 172,166" fill="url(#g1)"/>
+        <polygon id="beam2" class="beam anim" points="150,290 220,166 356,166" fill="url(#g2)"/>
+        <polygon id="beam3" class="beam anim" points="150,290 404,166 540,166" fill="url(#g3)"/>
+        <polygon id="beam4" class="beam anim" points="150,290 588,166 724,166" fill="url(#g4)"/>
 
         <!-- panel 1: source code -->
         <g>
-          <rect x="16" y="16" width="224" height="150" rx="6" fill="#141926" stroke="#2E3650"/>
-          <text x="30" y="38" class="mono" font-size="10.5" letter-spacing="1.2" fill="#AEB6C0">SOURCE CODE</text>
+          <title>Source code
+Scanned in a meaningful order,
+chosen by heuristics</title>
+          <rect x="16" y="16" width="176" height="150" rx="6" fill="#141926" stroke="#2E3650"/>
+          <text x="28" y="36" class="mono" font-size="10" letter-spacing="1.2" fill="#AEB6C0">SOURCE CODE</text>
           <g clip-path="url(#c1)">
-            <rect id="scan1" class="scan anim" x="16" y="47" width="224" height="13" fill="#4FC4F4" fill-opacity=".14"/>
+            <rect id="scan1" class="scan anim" x="16" y="45" width="176" height="13" fill="#4FC4F4" fill-opacity=".14"/>
             <g id="hl1" class="hl anim">
-              <rect x="20" y="117" width="216" height="28" rx="3" fill="#F5B54A" fill-opacity=".2"/>
-              <rect x="20" y="117" width="3" height="28" fill="#F5B54A"/>
-              <text x="230" y="38" text-anchor="end" class="mono" font-size="10" fill="#F5B54A">no role check</text>
+              <rect x="20" y="115" width="168" height="29" rx="3" fill="#F5B54A" fill-opacity=".2"/>
+              <rect x="20" y="115" width="3" height="29" fill="#F5B54A"/>
+              <text x="180" y="159" text-anchor="end" class="mono" font-size="9.5" fill="#F5B54A">no role check</text>
             </g>
-            <g class="mono" font-size="10">
+            <g class="mono" font-size="9.5">
               <g fill="#5A6478">
-                <text x="28" y="58">12</text><text x="28" y="72">13</text><text x="28" y="86">14</text><text x="28" y="100">15</text>
-                <text x="28" y="114">16</text><text x="28" y="128">17</text><text x="28" y="142">18</text><text x="28" y="156">19</text>
+                <text x="26" y="56">12</text><text x="26" y="70">13</text><text x="26" y="84">14</text><text x="26" y="98">15</text>
+                <text x="26" y="112">16</text><text x="26" y="126">17</text><text x="26" y="140">18</text>
               </g>
-              <text x="50" y="58" fill="#C9D1D9"><tspan fill="#6FD3F8">def</tspan> getAccount(id) =</text>
-              <text x="50" y="72" fill="#C9D1D9">  <tspan fill="#6FD3F8">val</tspan> bank = findBank(id)</text>
-              <text x="50" y="86" fill="#C9D1D9">  authorise(user, bank)</text>
-              <text x="50" y="100" fill="#C9D1D9">  accounts.<tspan fill="#77CC8B">byId</tspan>(id)</text>
-              <text x="50" y="114" fill="#5A6478">  // consents</text>
-              <text x="50" y="128" fill="#C9D1D9"><tspan fill="#6FD3F8">def</tspan> deleteConsent(id) =</text>
-              <text x="50" y="142" fill="#C9D1D9">  consents.<tspan fill="#77CC8B">delete</tspan>(id)</text>
-              <text x="50" y="156" fill="#C9D1D9">  Ok()</text>
+              <text x="44" y="56" fill="#C9D1D9"><tspan fill="#6FD3F8">def</tspan> account(id) =</text>
+              <text x="44" y="70" fill="#C9D1D9">  authorise(user)</text>
+              <text x="44" y="84" fill="#C9D1D9">  accounts.<tspan fill="#77CC8B">byId</tspan>(id)</text>
+              <text x="44" y="98" fill="#C9D1D9">  Ok()</text>
+              <text x="44" y="112" fill="#5A6478">// consents</text>
+              <text x="44" y="126" fill="#C9D1D9"><tspan fill="#6FD3F8">def</tspan> deleteConsent(id)</text>
+              <text x="44" y="140" fill="#C9D1D9">  consents.<tspan fill="#77CC8B">delete</tspan>(id)</text>
             </g>
           </g>
-          <rect id="ring1" class="ring anim" x="16" y="16" width="224" height="150" rx="6" fill="none" stroke="#4FC4F4" stroke-width="2"/>
+          <rect id="ring1" class="ring anim" x="16" y="16" width="176" height="150" rx="6" fill="none" stroke="#4FC4F4" stroke-width="2"/>
         </g>
 
         <!-- panel 2: logs -->
         <g>
-          <rect x="268" y="16" width="224" height="150" rx="6" fill="#141926" stroke="#2E3650"/>
-          <text x="282" y="38" class="mono" font-size="10.5" letter-spacing="1.2" fill="#AEB6C0">LOGS</text>
+          <title>Logs
+Watched over hours
+before Senti suggests anything</title>
+          <rect x="200" y="16" width="176" height="150" rx="6" fill="#141926" stroke="#2E3650"/>
+          <text x="212" y="36" class="mono" font-size="10" letter-spacing="1.2" fill="#AEB6C0">LOGS</text>
           <g clip-path="url(#c2)">
-            <rect id="scan2" class="scan anim" x="268" y="47" width="224" height="13" fill="#4FC4F4" fill-opacity=".14"/>
+            <rect id="scan2" class="scan anim" x="200" y="45" width="176" height="13" fill="#4FC4F4" fill-opacity=".14"/>
             <g id="hl2" class="hl anim">
-              <rect x="272" y="76" width="216" height="13" rx="2" fill="#F2766B" fill-opacity=".2"/>
-              <rect x="272" y="104" width="216" height="13" rx="2" fill="#F2766B" fill-opacity=".2"/>
-              <rect x="272" y="132" width="216" height="13" rx="2" fill="#F2766B" fill-opacity=".2"/>
-              <text x="482" y="38" text-anchor="end" class="mono" font-size="10" fill="#F2766B">×1,240 an hour</text>
+              <rect x="204" y="74" width="168" height="13" rx="2" fill="#F2766B" fill-opacity=".2"/>
+              <rect x="204" y="102" width="168" height="13" rx="2" fill="#F2766B" fill-opacity=".2"/>
+              <rect x="204" y="130" width="168" height="13" rx="2" fill="#F2766B" fill-opacity=".2"/>
+              <text x="364" y="159" text-anchor="end" class="mono" font-size="9.5" fill="#F2766B">×1,240 an hour</text>
             </g>
-            <g class="mono" font-size="10" fill="#C9D1D9">
-              <text x="280" y="58"><tspan fill="#5A6478">INFO </tspan> GET /banks 200 12ms</text>
-              <text x="280" y="72"><tspan fill="#5A6478">INFO </tspan> GET /accounts 200 41ms</text>
-              <text x="280" y="86"><tspan fill="#F2766B">ERROR</tspan> redis timeout 5000ms</text>
-              <text x="280" y="100"><tspan fill="#5A6478">INFO </tspan> POST /consents 201</text>
-              <text x="280" y="114"><tspan fill="#F2766B">ERROR</tspan> redis timeout 5000ms</text>
-              <text x="280" y="128"><tspan fill="#F5B54A">WARN </tspan> retry redis (2/3)</text>
-              <text x="280" y="142"><tspan fill="#F2766B">ERROR</tspan> redis timeout 5000ms</text>
-              <text x="280" y="156"><tspan fill="#5A6478">INFO </tspan> GET /banks 200 9ms</text>
+            <g class="mono" font-size="9.5" fill="#C9D1D9">
+              <text x="210" y="56"><tspan fill="#5A6478">INFO </tspan> GET /banks 200</text>
+              <text x="210" y="70"><tspan fill="#5A6478">INFO </tspan> GET /accounts 200</text>
+              <text x="210" y="84"><tspan fill="#F2766B">ERROR</tspan> redis timeout</text>
+              <text x="210" y="98"><tspan fill="#5A6478">INFO </tspan> POST /consents</text>
+              <text x="210" y="112"><tspan fill="#F2766B">ERROR</tspan> redis timeout</text>
+              <text x="210" y="126"><tspan fill="#F5B54A">WARN </tspan> retry redis 2/3</text>
+              <text x="210" y="140"><tspan fill="#F2766B">ERROR</tspan> redis timeout</text>
             </g>
           </g>
-          <rect id="ring2" class="ring anim" x="268" y="16" width="224" height="150" rx="6" fill="none" stroke="#4FC4F4" stroke-width="2"/>
+          <rect id="ring2" class="ring anim" x="200" y="16" width="176" height="150" rx="6" fill="none" stroke="#4FC4F4" stroke-width="2"/>
         </g>
 
-        <!-- panel 3: metrics and telemetry -->
+        <!-- panel 3: metrics -->
         <g>
-          <rect x="520" y="16" width="224" height="150" rx="6" fill="#141926" stroke="#2E3650"/>
-          <text x="534" y="38" class="mono" font-size="10.5" letter-spacing="1.2" fill="#AEB6C0">METRICS · TELEMETRY</text>
+          <title>Metrics
+Counts and averages over time</title>
+          <rect x="384" y="16" width="176" height="150" rx="6" fill="#141926" stroke="#2E3650"/>
+          <text x="396" y="36" class="mono" font-size="10" letter-spacing="1.2" fill="#AEB6C0">METRICS</text>
           <g clip-path="url(#c3)">
             <g stroke="#2A3142" stroke-width="1">
-              <line x1="534" y1="70" x2="730" y2="70"/><line x1="534" y1="100" x2="730" y2="100"/><line x1="534" y1="130" x2="730" y2="130"/>
+              <line x1="396" y1="68" x2="548" y2="68"/><line x1="396" y1="96" x2="548" y2="96"/><line x1="396" y1="124" x2="548" y2="124"/>
             </g>
             <g fill="#2E3A52">
-              <rect x="536" y="146" width="9" height="8"/><rect x="550" y="143" width="9" height="11"/><rect x="564" y="145" width="9" height="9"/>
-              <rect x="578" y="141" width="9" height="13"/><rect x="592" y="144" width="9" height="10"/><rect x="606" y="140" width="9" height="14"/>
-              <rect x="620" y="142" width="9" height="12"/><rect x="634" y="139" width="9" height="15"/><rect x="648" y="141" width="9" height="13"/>
-              <rect x="662" y="138" width="9" height="16"/><rect x="676" y="140" width="9" height="14"/><rect x="690" y="137" width="9" height="17"/>
-              <rect x="704" y="139" width="9" height="15"/><rect x="718" y="136" width="9" height="18"/>
+              <rect x="398" y="134" width="9" height="8"/><rect x="411" y="131" width="9" height="11"/><rect x="424" y="133" width="9" height="9"/>
+              <rect x="437" y="129" width="9" height="13"/><rect x="450" y="132" width="9" height="10"/><rect x="463" y="128" width="9" height="14"/>
+              <rect x="476" y="130" width="9" height="12"/><rect x="489" y="127" width="9" height="15"/><rect x="502" y="129" width="9" height="13"/>
+              <rect x="515" y="126" width="9" height="16"/><rect x="528" y="125" width="9" height="17"/>
             </g>
-            <polyline points="540,122 554,120 568,123 582,119 596,121 610,118 624,120 638,117 652,114 666,110 680,102 694,90 708,74 722,60" fill="none" stroke="#6FD3F8" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-            <text x="534" y="60" class="mono" font-size="9.5" fill="#5A6478">p95 ms</text>
+            <polyline points="402,116 415,114 428,117 441,113 454,115 467,112 480,109 493,103 506,92 519,76 532,60" fill="none" stroke="#6FD3F8" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+            <text x="396" y="56" class="mono" font-size="9" fill="#5A6478">p95 response ms</text>
             <g id="scan3" class="scan anim">
-              <line x1="540" y1="44" x2="540" y2="156" stroke="#4FC4F4" stroke-width="1.5" stroke-opacity=".7"/>
+              <line x1="400" y1="44" x2="400" y2="144" stroke="#4FC4F4" stroke-width="1.5" stroke-opacity=".7"/>
             </g>
             <g id="hl3" class="hl anim">
-              <circle class="pulse" cx="722" cy="60" r="8" fill="none" stroke="#F5B54A" stroke-width="2"/>
-              <circle cx="722" cy="60" r="4" fill="#F5B54A"/>
-              <text x="706" y="62" text-anchor="end" class="mono" font-size="10" fill="#F5B54A">3× slower</text>
+              <circle class="pulse" cx="532" cy="60" r="7" fill="none" stroke="#F5B54A" stroke-width="2"/>
+              <circle cx="532" cy="60" r="3.5" fill="#F5B54A"/>
+              <text x="548" y="159" text-anchor="end" class="mono" font-size="9.5" fill="#F5B54A">3× slower</text>
             </g>
           </g>
-          <rect id="ring3" class="ring anim" x="520" y="16" width="224" height="150" rx="6" fill="none" stroke="#4FC4F4" stroke-width="2"/>
+          <rect id="ring3" class="ring anim" x="384" y="16" width="176" height="150" rx="6" fill="none" stroke="#4FC4F4" stroke-width="2"/>
+        </g>
+
+        <!-- panel 4: telemetry -->
+        <g>
+          <title>Telemetry
+System resources: CPU, memory, disk, connections</title>
+          <rect x="568" y="16" width="176" height="150" rx="6" fill="#141926" stroke="#2E3650"/>
+          <text x="580" y="36" class="mono" font-size="10" letter-spacing="1.2" fill="#AEB6C0">TELEMETRY</text>
+          <g clip-path="url(#c4)">
+            <rect id="scan4" class="scan anim" x="568" y="45" width="176" height="20" fill="#4FC4F4" fill-opacity=".12"/>
+            <g class="mono" font-size="9.5" fill="#C9D1D9">
+              <text x="580" y="56">redis conns</text><text x="732" y="56" text-anchor="end">48/50</text>
+              <text x="580" y="82">CPU</text><text x="732" y="82" text-anchor="end">38%</text>
+              <text x="580" y="108">RAM</text><text x="732" y="108" text-anchor="end">6.1 / 8 GB</text>
+              <text x="580" y="134">disk</text><text x="732" y="134" text-anchor="end">54%</text>
+            </g>
+            <g fill="#2A3142">
+              <rect x="580" y="61" width="152" height="5" rx="2.5"/><rect x="580" y="87" width="152" height="5" rx="2.5"/>
+              <rect x="580" y="113" width="152" height="5" rx="2.5"/><rect x="580" y="139" width="152" height="5" rx="2.5"/>
+            </g>
+            <g fill="#6FD3F8">
+              <rect x="580" y="61" width="146" height="5" rx="2.5"/><rect x="580" y="87" width="58" height="5" rx="2.5"/>
+              <rect x="580" y="113" width="116" height="5" rx="2.5"/><rect x="580" y="139" width="82" height="5" rx="2.5"/>
+            </g>
+            <g id="hl4" class="hl anim">
+              <rect x="572" y="46" width="168" height="23" rx="3" fill="#F2766B" fill-opacity=".16"/>
+              <rect x="580" y="61" width="146" height="5" rx="2.5" fill="#F2766B"/>
+              <text x="732" y="159" text-anchor="end" class="mono" font-size="9.5" fill="#F2766B">conns maxed</text>
+            </g>
+          </g>
+          <rect id="ring4" class="ring anim" x="568" y="16" width="176" height="150" rx="6" fill="none" stroke="#4FC4F4" stroke-width="2"/>
         </g>
 
         <!-- Senti -->
         <g>
+          <title>Senti
+Watching for hours, not seconds</title>
           <line x1="150" y1="276" x2="150" y2="264" stroke="#4FC4F4" stroke-width="2"/>
           <circle class="live" cx="150" cy="261" r="4.5" fill="#77CC8B"/>
           <circle cx="150" cy="318" r="42" fill="#232A3D" stroke="#4FC4F4" stroke-width="3"/>
@@ -352,6 +408,8 @@
 
         <!-- digest -->
         <g>
+          <title>The digest
+Three suggestions at most, ranked by impact</title>
           <rect x="290" y="204" width="454" height="212" rx="6" fill="#232A3D" stroke="#2E3650"/>
           <text x="310" y="231" class="mono" font-size="10.5" letter-spacing="1.2" fill="#AEB6C0">DIGEST · THE FEW THAT MATTER</text>
           <line x1="310" y1="243" x2="724" y2="243" stroke="#2E3650"/>
@@ -362,20 +420,23 @@
             <text x="344" y="284" class="mono" font-size="10" fill="#AEB6C0"><tspan fill="#F5B54A">SOURCE</tspan> · reachable without a role</text>
           </g>
           <g id="row2" class="row anim">
-            <circle cx="322" cy="324" r="11" fill="#4FC4F4"/>
-            <text x="322" y="328.5" text-anchor="middle" class="sans" font-size="12" font-weight="700" fill="#1B2032">2</text>
-            <text x="344" y="320" class="body" font-size="15" font-weight="700" fill="#FFFFFF">Find out why Redis keeps timing out</text>
-            <text x="344" y="338" class="mono" font-size="10" fill="#AEB6C0"><tspan fill="#F2766B">LOGS</tspan> · 1,240 an hour, 4× yesterday</text>
+            <circle cx="322" cy="320" r="11" fill="#4FC4F4"/>
+            <text x="322" y="324.5" text-anchor="middle" class="sans" font-size="12" font-weight="700" fill="#1B2032">2</text>
+            <text x="344" y="316" class="body" font-size="15" font-weight="700" fill="#FFFFFF">Fix the Redis timeouts</text>
+            <text x="344" y="334" class="mono" font-size="10" fill="#AEB6C0"><tspan fill="#F2766B">LOGS</tspan> · 1,240 timeouts an hour, 4× yesterday</text>
+          </g>
+          <g id="row2b" class="row anim">
+            <text x="344" y="348" class="mono" font-size="10" fill="#AEB6C0"><tspan fill="#F2766B">+ TELEMETRY</tspan> · cause: Redis connections maxed out at peak</text>
           </g>
           <g id="row3" class="row anim">
-            <circle cx="322" cy="378" r="11" fill="#4FC4F4"/>
-            <text x="322" y="382.5" text-anchor="middle" class="sans" font-size="12" font-weight="700" fill="#1B2032">3</text>
-            <text x="344" y="374" class="body" font-size="15" font-weight="700" fill="#FFFFFF">Speed up the query behind GET /accounts</text>
-            <text x="344" y="392" class="mono" font-size="10" fill="#AEB6C0"><tspan fill="#6FD3F8">METRICS</tspan> · p95 latency up 3× since 14:00</text>
+            <circle cx="322" cy="384" r="11" fill="#4FC4F4"/>
+            <text x="322" y="388.5" text-anchor="middle" class="sans" font-size="12" font-weight="700" fill="#1B2032">3</text>
+            <text x="344" y="380" class="body" font-size="15" font-weight="700" fill="#FFFFFF">Speed up the query behind GET /accounts</text>
+            <text x="344" y="398" class="mono" font-size="10" fill="#AEB6C0"><tspan fill="#F5B54A">METRICS</tspan> · p95 response time up 3× since 14:00</text>
           </g>
         </g>
       </svg>
-      <figcaption>Source code, logs, metrics and telemetry in. Three things worth fixing out.</figcaption>
+      <figcaption>Source code, logs, metrics and telemetry in. Most important issues out.</figcaption>
     </figure>
   </div>
 </header>
@@ -388,17 +449,22 @@
       <div class="look">
         <p class="num">01</p>
         <h3>Source code</h3>
-        <p>Reads the code of every endpoint that can be reached, open ones first, looking for SQL injection, missing authorisation checks and similar problems. It reads the exact commit each server is running.</p>
+        <p>Reads the code behind every page and endpoint that can be reached, public ones first, looking for SQL injection, missing authorisation checks and similar problems. It reads the exact commit each server is running.</p>
       </div>
       <div class="look">
         <p class="num">02</p>
         <h3>Logs</h3>
-        <p>Strips ids, numbers, emails and other details from each line, so one problem is one signature, then counts every signature over time. A thousand timeouts become one finding, not a thousand alerts.</p>
+        <p>One record per event: a request, an error, a retry. Senti strips ids, numbers, emails and other details from each line, so one problem is one signature, then counts every signature over time. A thousand timeouts become one finding, not a thousand alerts.</p>
       </div>
       <div class="look">
         <p class="num">03</p>
-        <h3>Metrics and telemetry</h3>
-        <p>Follows call counts, response times and latencies, and compares the last hours with the hours before. It notices what is getting slower before your users do.</p>
+        <h3>Metrics</h3>
+        <p>Aggregates over time: call counts, and averages and percentiles of response times. Senti compares the last hours with the hours before, and notices what is getting slower before your users do.</p>
+      </div>
+      <div class="look">
+        <p class="num">04</p>
+        <h3>Telemetry</h3>
+        <p>System resources: CPU, memory, disk and connections. Senti correlates a slow page, a slow endpoint or a burst of errors with the resource that ran out.</p>
       </div>
     </div>
   </section>
@@ -419,8 +485,8 @@
   <section id="safe">
     <div class="sechead"><h2>Safe by design</h2></div>
     <ul class="points">
-      <li><b>Read-only</b>Senti never changes settings, edits code or opens pull requests</li>
-      <li><b>On your infrastructure</b>It runs next to your API, with its own read-only credentials</li>
+      <li><b>Fixes, when you ask</b>Senti never changes your running system. Press Fix this and it makes the change in its own copy of the code, builds and tests it, then hands it to you to commit or discard</li>
+      <li><b>On your infrastructure</b>It runs alongside what it watches, with its own read-only credentials</li>
       <li><b>Capped AI spend</b>Every analysis and every code review has its own budget limit</li>
       <li><b>Your own AI account</b>Senti uses Claude through your own account and budget</li>
     </ul>
@@ -431,7 +497,7 @@
     <div class="editions">
       <div class="edition">
         <h3><img class="logo-mark" alt="" src="data:image/png;base64,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">TESOBE Senti</h3>
-        <p class="for">For any API stack</p>
+        <p class="for">For any API, app or website</p>
         <p>We connect Senti to your logs, metrics and code during setup, and tune it to what matters in your system.</p>
       </div>
       <div class="edition obp">
@@ -445,16 +511,15 @@
   <section id="talk">
     <div class="sechead"><h2>Talk to us</h2></div>
     <div class="contact">
-      <p>Tell us about the API you would like Senti to watch: what it runs on, and what keeps you up at night.</p>
+      <p>Tell us what you would like Senti to watch - an API, an app, a website or a service - what it runs on, and what keeps you up at night.</p>
       <p class="mailto"><a href="mailto:contact@tesobe.com?subject=TESOBE%20Senti">contact@tesobe.com</a></p>
     </div>
   </section>
 
   <footer>
     <p class="stats">
-      <span><a href="https://www.tesobe.com">TESOBE GmbH</a> · Berlin since 2004</span>
+      <span><a href="https://www.tesobe.com">TESOBE GmbH</a> · Innovating in Berlin since 2004</span>
       <span><a href="https://www.openbankproject.com">Open Bank Project</a> since 2010</span>
-      <span><a href="https://ventures.tesobe.com">TESOBE Ventures</a></span>
     </p>
   </footer>
 
