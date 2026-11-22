@@ -1,3 +1,4 @@
+import os
 import subprocess
 from dataclasses import replace
 
@@ -443,7 +444,7 @@ def test_the_rules_and_build_come_from_the_kinds_toolchain():
                         TOOLCHAIN)
     assert "4. Compile: mvn -o -q -f /w/pom.xml -pl obp-commons,obp-api test-compile" in text
     assert "python3 /w/scripts/check_lift_http4s_resource_doc_parity.py" in text and "ErrorMessages" in text
-    plain = Toolchain(build=lambda w: ["npm", "--prefix", w], compile_goal=("run", "check"), test_goal="test -- <files>",
+    plain = Toolchain(build=lambda w, f: ["npm", "--prefix", w], compile_goal=("run", "check"), test_goal="test -- <files>",
                       source_dirs=("src",))
     text = fixer.prompt({"title": "t", "evidence": "e", "hypothesis": "h", "files": "[]", "suggested_fix": "f"}, "/w",
                         plain)
@@ -451,5 +452,80 @@ def test_the_rules_and_build_come_from_the_kinds_toolchain():
     assert "only in /w/src." in text and "ErrorMessages" not in text and "python3" not in text
 
 
-def test_fix_this_is_not_offered_for_a_kind_without_a_toolchain(config):
+def test_fix_this_is_not_offered_for_a_kind_without_a_toolchain(config, monkeypatch):
+    kind = fixer.kind_of("sveltekit")
+    monkeypatch.setattr(fixer, "kind_of", lambda name: replace(kind, toolchain=None))
     assert "not set up for sveltekit services" in fixer.unavailable_reason(replace(config, kind="sveltekit"))
+
+
+@pytest.mark.parametrize("kind", ["sveltekit", "vue-express", "scala-http4s"])
+def test_fix_this_is_offered_for_the_app_kinds_with_a_checkout(cfg, kind):
+    assert fixer.unavailable_reason(replace(cfg, kind=kind)) is None
+
+
+def test_a_sveltekit_app_in_a_monorepo_is_built_and_fixed_in_its_own_workspace(config):
+    toolchain = fixer.toolchain_of(replace(config, kind="sveltekit", folder="apps/portal"))
+    assert toolchain.command("/w") == ["npm", "--prefix", "/w", "--workspace", "apps/portal"]
+    assert toolchain.source_dirs == ("apps/portal/src", "apps/portal/test", "apps/portal/tests", "packages")
+    text = fixer.prompt({"title": "t", "evidence": "e", "hypothesis": "h", "files": "[]", "suggested_fix": "f"}, "/w",
+                        toolchain)
+    assert "4. Compile: npm --prefix /w --workspace apps/portal run build" in text and "followed by run check" in text
+    assert "npm --prefix /w --workspace apps/portal exec -- vitest run" in text
+    assert "/w/apps/portal/src/hooks.server.ts" in text and "{folder}" not in text
+
+
+def test_a_service_at_the_top_of_its_checkout_has_no_folder_in_its_paths(config):
+    toolchain = fixer.toolchain_of(replace(config, kind="scala-http4s", folder=""))
+    assert toolchain.command("/w") == ["mvn", "-o", "-q", "-f", "/w/pom.xml"] and toolchain.source_dirs == ("src",)
+    text = fixer.prompt({"title": "t", "evidence": "e", "hypothesis": "h", "files": "[]", "suggested_fix": "f"}, "/w",
+                        toolchain)
+    assert "4. Compile: mvn -o -q -f /w/pom.xml test-compile" in text and "/w/src/main/scala" in text
+    assert "{folder}" not in text and "/w//" not in text
+
+
+def test_node_packages_are_installed_only_when_the_lock_file_changed(tmp_path):
+    from senti.kinds import node
+
+    assert node.install(str(tmp_path)) is None  # no lock file: nothing to install
+    lock = tmp_path / "package-lock.json"
+    lock.write_text("{}")
+    assert node.install(str(tmp_path))[:2] == ["npm", "ci"]
+    installed = tmp_path / "node_modules" / ".package-lock.json"
+    installed.parent.mkdir()
+    installed.write_text("{}")
+    assert node.install(str(tmp_path)) is None
+    os.utime(lock, (installed.stat().st_mtime + 10,) * 2)
+    assert node.install(str(tmp_path))[:2] == ["npm", "ci"]
+
+
+def test_a_failed_prepare_stops_the_fix_before_claude_runs(cfg, monkeypatch):
+    toolchain = replace(TOOLCHAIN, prepare=lambda w: ["false"])
+    monkeypatch.setattr(fixer, "toolchain_of", lambda c: toolchain)
+    monkeypatch.setattr(fixer, "run_claude", lambda *a, **k: pytest.fail("Claude ran"))
+    store = Store(cfg.db_path)
+    finding_id = finding(store)
+    store.close()
+    assert fixer.fix(cfg, finding_id) == "failed"
+    store = Store(cfg.db_path)
+    assert "could not prepare its worktree (false)" in store.db.execute(
+        "SELECT fix FROM findings WHERE id = ?", (finding_id,)).fetchone()[0]
+    store.close()
+
+
+def test_an_apps_fixes_are_made_in_a_worktree_of_its_own_checkout(monkeypatch, tmp_path):
+    from senti import config as config_module
+
+    setup = tmp_path / "senti.toml"
+    setup.write_text(
+        '[system]\nname = "obp"\n'
+        '[[service]]\nname = "obp-api"\nkind = "obp-api"\nsource = "/src/OBP-API"\n'
+        '[[service]]\nname = "portal"\nkind = "sveltekit"\nsource = "/src/OBP-Frontend"\n'
+        '[[environment]]\nname = "local"\n'
+        '[[instance]]\nid = "local"\nservice = "obp-api"\nenvironment = "local"\nurl = "http://localhost:8080"\n'
+        'credentials = "LOCAL_OIDC"\n')
+    monkeypatch.setenv("SENTI_SETUP", str(setup))
+    monkeypatch.setattr(config_module, "_app_urls", lambda parent: {"portal": "http://localhost:5174"})
+    monkeypatch.setattr(config_module, "kept_directory", lambda c, urls=None: {"portal": "http://localhost:5174"})
+    assert config_module.Config.from_env("local").fix_worktree == "/src/OBP-API-sentinel-fixes"
+    portal = config_module.Config.from_env("local-portal")
+    assert portal.fix_worktree == "/src/OBP-Frontend-sentinel-fixes" and portal.folder == "apps/portal"

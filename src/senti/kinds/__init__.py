@@ -10,7 +10,7 @@ spring-boot has its own (Logback's default layout).
 
 import re
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 NOTES = Path(__file__).parent / "notes"
@@ -29,15 +29,36 @@ class LogFormat:
 @dataclass(frozen=True)
 class Toolchain:
     """How a fix is made and checked in this kind of code (fixer.py). Paths are relative to the worktree, Senti's own
-    git worktree of the checkout."""
+    git worktree of the checkout. `source_dirs`, `copied` and `fix_notes` may say {folder}, the service's folder in
+    its checkout (as in a monorepo), which `at` fills in."""
 
-    build: Callable[[str], list[str]]  # the build command for a worktree, without its goal
-    compile_goal: tuple[str, ...]  # added to `build`: compiles the main and the test code
-    test_goal: str  # added to `build` in the prompt: runs only the named tests
+    build: Callable[[str, str], list[str]]  # the build command for a worktree and the service's folder, without its goal
+    compile_goal: tuple[str, ...]  # added to the build command: compiles (or checks) the main and the test code
+    test_goal: str  # added to the build command in the prompt: runs only the named tests
     source_dirs: tuple[str, ...]  # what a fix may change
     scripts: tuple[str, ...] = ()  # scripts in the worktree a fix may run with python3
     copied: tuple[str, ...] = ()  # git-ignored files the build needs, copied from the checkout (glob patterns)
     fix_notes: str = ""  # rules for a fix in this kind of code, for the prompt; {worktree} is filled in
+    prepare: Callable[[str], list[str] | None] | None = None  # what to run in the worktree before each fix, if anything
+    folder: str = ""  # the service's folder in its checkout, "" at the top: set by `at`
+
+    def at(self, folder: str) -> "Toolchain":
+        """This toolchain for a service whose code is in `folder` of its checkout ("" for the top)."""
+        def inside(path: str) -> str:
+            return path.replace("{folder}", folder).strip("/")
+
+        return replace(self, folder=folder.strip("/"), source_dirs=tuple(inside(d) for d in self.source_dirs),
+                       copied=tuple(inside(c) for c in self.copied),
+                       fix_notes=self.fix_notes.replace("{folder}/", f"{folder.strip('/')}/" if folder.strip("/") else ""))
+
+    def command(self, worktree: str) -> list[str]:
+        """The build command for the service in `worktree`, without its goal."""
+        return self.build(worktree, self.folder)
+
+
+def in_folder(worktree: str, folder: str) -> str:
+    """The service's folder in a worktree: the worktree itself when the service is at the top."""
+    return f"{worktree}/{folder}" if folder else worktree
 
 
 @dataclass(frozen=True)

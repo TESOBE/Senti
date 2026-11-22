@@ -13,7 +13,7 @@ An exception follows its message, with `\\tat ...` stack lines. A request path i
 import re
 from pathlib import Path
 
-from . import NOTES, Kind, LogFormat, Toolchain, notes
+from . import NOTES, Kind, LogFormat, Toolchain, in_folder, notes
 
 LOG_FORMAT = LogFormat(
     line=re.compile(
@@ -27,10 +27,11 @@ LOG_FORMAT = LogFormat(
 )
 
 
-def maven(worktree: str) -> list[str]:
+def maven(worktree: str, folder: str = "") -> list[str]:
     """The project's Maven wrapper if it has one, else mvn; offline, so a fix fetches nothing."""
-    wrapper = Path(worktree) / "mvnw"
-    return [str(wrapper) if wrapper.exists() else "mvn", "-o", "-q", "-f", f"{worktree}/pom.xml"]
+    project = in_folder(worktree, folder)
+    wrapper = Path(project) / "mvnw"
+    return [str(wrapper) if wrapper.exists() else "mvn", "-o", "-q", "-f", f"{project}/pom.xml"]
 
 
 TOOLCHAIN = Toolchain(

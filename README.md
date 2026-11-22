@@ -83,6 +83,8 @@ never branches, pushes or opens pull requests.
 
 ## Setup
 
+Once Senti runs, its Setup page (`/setup`, linked at the top of the page) shows what it watches and what is still missing: the setup file, Claude Code, each service's checkout and whether Fix this works for it, and each instance with whether Senti is connected and what to do about each problem.
+
 1. In OBP-API's props, enable the log cache (it needs Redis):
 
    ```properties

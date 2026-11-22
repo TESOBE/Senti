@@ -51,7 +51,9 @@ _progress: dict[tuple[str, int], dict] = {}  # (instance, finding id) being fixe
 
 
 def toolchain_of(config: Config) -> Toolchain | None:
-    return kind_of(config.kind).toolchain
+    """The kind's toolchain, for where the service's code is in its checkout."""
+    toolchain = kind_of(config.kind).toolchain
+    return toolchain.at(config.folder) if toolchain else None
 
 
 def unavailable_reason(config: Config) -> str | None:
@@ -111,10 +113,24 @@ def discard(worktree: str, toolchain: Toolchain) -> None:
     git(worktree, "clean", "-fdq", "--", *toolchain.source_dirs)
 
 
+def prepared(worktree: str, toolchain: Toolchain) -> tuple[str, str | None] | None:
+    """Run what the toolchain needs done in the worktree before a fix (e.g. installing node packages), if anything:
+    None if nothing was needed, else the command and None if it worked, or the end of its output if it did not."""
+    needed = toolchain.prepare(worktree) if toolchain.prepare else None
+    if not needed:
+        return None
+    try:
+        out = subprocess.run(needed, cwd=worktree, capture_output=True, text=True, timeout=COMPILE_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        return " ".join(needed), f"It took over {COMPILE_TIMEOUT_SECONDS // 60} minutes"
+    said = (out.stdout + out.stderr).strip()[-500:] or f"It stopped with exit code {out.returncode}, saying nothing"
+    return " ".join(needed), None if out.returncode == 0 else said
+
+
 def compiles(worktree: str, toolchain: Toolchain) -> str | None:
     """None if main and test code compile, else the end of the build's output."""
     try:
-        out = subprocess.run([*toolchain.build(worktree), *toolchain.compile_goal], capture_output=True, text=True,
+        out = subprocess.run([*toolchain.command(worktree), *toolchain.compile_goal], capture_output=True, text=True,
                              timeout=COMPILE_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
         return f"Compiling took over {COMPILE_TIMEOUT_SECONDS // 60} minutes"
@@ -139,7 +155,7 @@ def comments_of(store: Store, finding_id: int) -> list[str]:
 
 def prompt(finding: dict, worktree: str, toolchain: Toolchain, comments: list[str] = (),
            known_classes: list[str] = classes.SEEDS, tests: bool = True) -> str:
-    build = " ".join(toolchain.build(worktree))
+    build = " ".join(toolchain.command(worktree))
     compile_command = " ".join([build, *toolchain.compile_goal])
     rules = toolchain.fix_notes.replace("{worktree}", worktree)
     return (
@@ -194,7 +210,7 @@ def prompt(finding: dict, worktree: str, toolchain: Toolchain, comments: list[st
 def command(config: Config, text: str) -> list[str]:
     worktree = str(Path(config.fix_worktree).resolve())
     toolchain = toolchain_of(config)
-    tools = ["Read", "Grep", "Glob", f"Bash({' '.join(toolchain.build(worktree))} *)"]
+    tools = ["Read", "Grep", "Glob", f"Bash({' '.join(toolchain.command(worktree))} *)"]
     tools += [f"Bash(python3 {worktree}/{script} *)" for script in toolchain.scripts]
     tools += [f"{tool}(/{worktree}/{d}/**)" for tool in ("Edit", "Write") for d in toolchain.source_dirs]
     tools += [f"Bash(git -C {worktree} {c} *)" for c in GIT_READ_COMMANDS]
@@ -479,6 +495,13 @@ def fix(config: Config, finding_id: int) -> str:
         head = git(source, "rev-parse", "HEAD")
         git(worktree, "checkout", "-q", "--detach", head)
         log("sentinel", f"Senti set its worktree to {head[:12]}, the commit your working tree is at")
+        if ran := prepared(worktree, toolchain):
+            needed, broken = ran
+            if broken:
+                log("sentinel", f"Could not prepare the worktree with {needed}:\n{broken}")
+                _record(config, finding_id, "failed", f"Not fixed: Senti could not prepare its worktree ({needed}).\n{broken}"[:2000])
+                return "failed"
+            log("sentinel", f"Senti prepared its worktree: {needed}")
 
         comments, known_classes = comments_of(store, finding_id), classes.known(store)
         if comments:

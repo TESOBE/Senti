@@ -22,7 +22,7 @@ from importlib.resources import files
 
 import httpx
 
-from . import build, classes, fixer, history, preferences, recheck, replies, sonar
+from . import build, classes, fixer, history, preferences, recheck, replies, setup_page, sonar
 from .analyst import Analyst, check_claude, decide, unavailable_reason
 from .config import Config, current_setup
 from .health import health
@@ -382,6 +382,10 @@ def make_handler(configs: list[Config], allowed_hosts: set[str], analysts: dict[
                 return self._send(HTTPStatus.OK, page("help.html"), "text/html; charset=utf-8")
             if path == "/fixed":
                 return self._send(HTTPStatus.OK, page("fixed.html"), "text/html; charset=utf-8")
+            if path == "/setup":
+                return self._send(HTTPStatus.OK, page("setup.html"), "text/html; charset=utf-8")
+            if path == "/api/setup":
+                return self._json(HTTPStatus.OK, setup_page.status(configs, self._with_store))
             if path == "/api/help":
                 return self._json(HTTPStatus.OK, help_text(configs))
             if path == "/api/instances":

@@ -7,7 +7,7 @@ from . import LIFT_REFERENCE
 PARITY_SCRIPTS = ("scripts/check_lift_http4s_resource_doc_parity.py", "scripts/resource_doc_baseline/allowlist_helper.py")
 
 
-def maven(worktree: str) -> list[str]:
+def maven(worktree: str, folder: str = "") -> list[str]:
     """Offline, and both modules in one build, so a change to obp-commons is never installed in ~/.m2."""
     return ["mvn", "-o", "-q", "-f", f"{worktree}/pom.xml", "-pl", "obp-commons,obp-api"]
 

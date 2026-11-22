@@ -52,7 +52,7 @@ Examples of kinds:
 | Kind | What it is | OBP services of this kind |
 |---|---|---|
 | `obp-api` | OBP-API: Scala, http4s with Lift history, resource docs, Roles, connectors, Maven | OBP-API |
-| `scala-http4s` | A Scala service on http4s and cats-effect, built with sbt | OBP-OIDC |
+| `scala-http4s` | A Scala service on http4s and cats-effect, built with Maven | OBP-OIDC |
 | `sveltekit` | A SvelteKit app on Node: server routes, sessions, calls to an API | API Manager, Portal, Cohort, Sandbox Populator |
 | `vue-express` | A Vue single-page app with an Express server | API Explorer II |
 | `spring-boot` | Java or Kotlin on Spring Boot, with Actuator and Micrometer | none; common in banks |
@@ -160,7 +160,7 @@ Done:
 
 - Every AI run is told which service it works on (`context.py`): its name, kind, instance, environment and source, then the kind's notes and the service's own notes. The kinds' notes are in `kinds/notes/` and `packs/obp/notes/obp-api.md`; every OBP app gets `packs/obp/notes/obp-app.md` as its service notes, with its folder in OBP-Frontend. A service's `notes` in `senti.toml` replace them.
 - The analyst agent is generic: where the code is, Lift, Roles and OBP error codes moved into the `obp-api` notes. Replies, bug classes and Trace history say "the service"; Trace history takes the kind's history notes (OBP-API's: Lift).
-- Fix this takes its build, compile and test commands, the folders a fix may change, the scripts it may run, the ignored files the build needs and its rules from the kind's toolchain (`packs/obp/toolchain.py` for OBP-API). A kind without a toolchain says Fix this is not set up for it yet.
+- Fix this takes its build, compile and test commands, the folders a fix may change, the scripts it may run, the ignored files the build needs and its rules from the kind's toolchain (`packs/obp/toolchain.py` for OBP-API; `kinds/sveltekit.py`, `kinds/vue_express.py` and `kinds/scala_http4s.py` for the others), filled in for the service's folder in its checkout (`apps/<app>` in OBP-Frontend), and anything to run in Senti's worktree before each fix (`npm ci` for the Node kinds, when the lock file has changed). A kind without a toolchain (spring-boot for now) says Fix this is not set up for it yet.
 - The analyst's summary names the service, kind and environment, and leaves out the calls section when the source offers no metrics.
 
 Still OBP-only, until a second kind needs them: the source review (`source.py` and the `senti-source-reviewer` agent: Scala endpoints, Roles), which only the `obp` source offers; the bug classes Senti starts from (`classes.SEEDS`); the Telemetry sections of the summary (phase 5); and the health page's OBP wording.

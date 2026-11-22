@@ -176,6 +176,7 @@ class Config:
     aggregate_metrics_api_version: str
     root_api_version: str
     obp_api_source: str
+    folder: str  # where the service's code is in that checkout, as in a monorepo; "" at the top
     obp_api_github_repo: str  # owner/name, to date running commits missing from the checkout; "" for none
 
     db_path: str
@@ -209,7 +210,7 @@ class Config:
     scan_budget_usd: float  # most one scan may spend
     scan_endpoints: int  # endpoints reviewed per scan
 
-    fix_worktree: str  # Fix this: Senti's own git worktree of OBP-API, next to OBP_API_SOURCE, made when first needed
+    fix_worktree: str  # Fix this: Senti's own git worktree of the service's checkout, next to it, made when first needed
     fix_budget_usd: float  # most one fix may spend
 
     build_actions_url: str  # the OBP-API build on GitHub Actions, shown at the top of the page (build.py)
@@ -318,6 +319,7 @@ class Config:
             aggregate_metrics_api_version=env("OBP_AGGREGATE_METRICS_API_VERSION", "v6.0.0"),
             root_api_version=env("OBP_ROOT_API_VERSION", "v5.1.0"),
             obp_api_source=source,
+            folder=APPS[app].folder if is_app else "",
             obp_api_github_repo=github_repo,
             db_path=in_home(env("SENTINEL_DB", f"sentinel-{name}.db" if named else "sentinel.db")),
             source_db_path=in_home(env("SENTINEL_SOURCE_DB", "sentinel-source.db")),
@@ -351,7 +353,8 @@ class Config:
             scan_minutes=int(env("SENTINEL_SCAN_MINUTES", "10")),
             scan_budget_usd=float(env("SENTINEL_SCAN_BUDGET_USD", "3")),
             scan_endpoints=int(env("SENTINEL_SCAN_ENDPOINTS", "2")),
-            fix_worktree=(obp_api_source.rstrip("/") + "-sentinel-fixes") if obp_api_source else "",
+            # Next to the service's own checkout: an app's fixes are made in a worktree of the app's code
+            fix_worktree=(source.rstrip("/") + "-sentinel-fixes") if source else "",
             fix_budget_usd=float(env("SENTINEL_FIX_BUDGET_USD", "15")),
             build_actions_url="" if is_app else obp_service.build if listed else env("OBP_API_BUILD_ACTIONS_URL", ""),
             sonarcloud_project="" if is_app else obp_service.sonarcloud if listed else env("SONARCLOUD_PROJECT", ""),

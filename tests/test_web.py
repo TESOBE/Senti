@@ -67,6 +67,22 @@ def test_the_fixed_page_is_served(server):
     assert status == 200 and b"<title>Senti Fixed</title>" in page
 
 
+def test_the_setup_page_shows_services_instances_and_claude_code_without_secrets(server, config):
+    status, page = request(server, "GET", "/setup")
+    assert status == 200 and b"<title>Senti Setup</title>" in page
+    status, data = request(server, "GET", "/api/setup")
+    setup = json.loads(data)
+    assert status == 200 and setup["claude"]["command"] == config.claude_command
+    assert [s["name"] for s in setup["services"]] == [config.service]
+    assert setup["services"][0]["instances"] == [config.name] and "fix_unavailable" in setup["services"][0]
+    instance = setup["instances"][0]
+    assert instance["name"] == config.name and instance["oidc_client_setting"] == config.oidc_client_setting
+    assert all(p["title"] for p in instance["problems"]) and instance["connected"] is False  # never polled
+    # The client's id and secret are never on the page, only the name of the setting that holds them
+    for secret in (config.oidc_client_id, config.oidc_client_secret):
+        assert not secret or secret not in data.decode()
+
+
 def test_help_reads_the_glossary_item_from_obp_api(server, config, monkeypatch):
     status, page = request(server, "GET", "/help")
     assert status == 200 and b"<title>Senti Help</title>" in page
