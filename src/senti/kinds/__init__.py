@@ -5,7 +5,7 @@ kind (preferences.py).
 
 Each general kind is a module here; a pack adds its own (packs/obp: obp-api). sveltekit, vue-express and scala-http4s
 take the OBP log format for now, which the OBP apps of those kinds need for their signature ids to stay the same;
-spring-boot has its own (Logback's default layout).
+spring-boot has its own (Logback's default layout), and rust-tracing reads JSON lines.
 """
 
 import re
@@ -24,6 +24,8 @@ class LogFormat:
     exceptions: tuple[re.Pattern, ...]  # group 1 is an exception's name; each is tried in turn, on detail then message
     path: re.Pattern  # a request path in a line: kept as the endpoint, and generalised in the template
     path_kept: int  # how many leading path segments are kept as they are: ['', 'obp', 'v5.1.0'] is 3
+    structured: Callable[[str], dict | None] | None = None  # for a line that is data (JSON): its ts, thread, logger,
+    # message and detail as text, or None if the line is not of this kind, which then goes by `line`
 
 
 @dataclass(frozen=True)
@@ -78,9 +80,10 @@ def notes(path: Path) -> str:
 
 def _all() -> dict[str, Kind]:
     from ..packs import obp
-    from . import scala_http4s, spring_boot, sveltekit, vue_express
+    from . import rust_tracing, scala_http4s, spring_boot, sveltekit, vue_express
 
-    return {k.name: k for k in (*obp.kinds(), sveltekit.KIND, vue_express.KIND, scala_http4s.KIND, spring_boot.KIND)}
+    return {k.name: k for k in (*obp.kinds(), sveltekit.KIND, vue_express.KIND, scala_http4s.KIND, spring_boot.KIND,
+                                  rust_tracing.KIND)}
 
 
 KINDS = _all()

@@ -10,7 +10,7 @@ import pytest
 
 from senti.collector import Collector
 from senti.config import Config, ConfigError
-from senti.model import SetupError, parse
+from senti.model import SetupError, parse, to_toml
 from senti.sources import Combined, offers_of, source_for
 from senti.sources.loki import LokiSource
 from senti.sources.prometheus import PrometheusSource, meters_of
@@ -97,7 +97,7 @@ def loki(config, streams):
     asked = []
 
     def handler(request):
-        asked.append({k: v[0] for k, v in parse_qs(urlsplit(str(request.url)).query).items()})
+        asked.append({k: v[0] for k, v in parse_qs(urlsplit(str(request.url)).query).items()} | {"headers": request.headers})
         assert request.url.path == "/loki/api/v1/query_range"
         return httpx.Response(200, json={"status": "success", "data": {"resultType": "streams", "result": streams}})
 
@@ -114,6 +114,27 @@ def test_loki_gives_a_levels_newest_lines_first_across_streams(config):
     q = asked[0]
     assert q["query"] == '{app="shop",env="local"} |~ "(?i)\\\\b(error|fatal|severe|critical)\\\\b"'
     assert (q["direction"], q["limit"]) == ("backward", "2")
+
+
+def test_loki_sends_its_tenant_and_strips_colour_codes(config):
+    source, asked = loki(config, [{"stream": {"app": "shop"}, "values": [
+        ["2000", "\x1b[2m2026-11-21T08:00:00Z\x1b[0m \x1b[33m WARN\x1b[0m shop: slow"]]}])
+    source.config = replace(source.config, loki_tenant="1")
+    assert source.logs("warning", 10) == ["2026-11-21T08:00:00Z  WARN shop: slow"]
+    assert asked[0]["headers"]["x-scope-orgid"] == "1"
+
+
+def test_loki_can_take_a_levels_lines_from_the_level_loki_works_out(config):
+    source, asked = loki(config, [])
+    source.config = replace(source.config, loki_level_from="detected_level")
+    source.logs("warning", 10)
+    assert asked[0]["query"] == '{app="shop",env="local"} | detected_level=~"warn|warning"'
+
+
+def test_loki_sends_no_tenant_unless_one_is_set(config):
+    source, asked = loki(config, [])
+    source.logs("error", 10)
+    assert "x-scope-orgid" not in asked[0]["headers"]
 
 
 def test_obp_api_read_through_obp_and_prometheus_takes_each_from_the_first_that_offers_it(config):
@@ -214,3 +235,20 @@ def test_mistakes_with_sources_are_explained(change, error):
 def test_an_unknown_source_is_named(config):
     with pytest.raises(ValueError, match="reads graphite, which Senti does not know"):
         source_for(replace(config, sources=("graphite",)))
+
+
+def test_loki_tenant_and_level_source_come_from_senti_toml(config, tmp_path):
+    text = SETUP.replace('url = "http://loki:3100"', 'url = "http://loki:3100"\ntenant = "1"\nlevel_from = "detected_level"')
+    setup = parse(tomllib.loads(text))
+    assert (setup.loki_tenant, setup.loki_level_from) == ("1", "detected_level")
+    assert parse(tomllib.loads(to_toml(setup))) == setup
+    (tmp_path / "senti.toml").write_text(text)
+    shop, _ = Config.all_from_env()
+    assert (shop.loki_tenant, shop.loki_level_from) == ("1", "detected_level")
+    plain = parse(tomllib.loads(SETUP))
+    assert (plain.loki_tenant, plain.loki_level_from) == ("", "text")
+
+
+def test_an_unknown_level_source_is_refused():
+    with pytest.raises(SetupError, match="level_from must be text or detected_level"):
+        parse(tomllib.loads(SETUP.replace('url = "http://loki:3100"', 'url = "http://loki:3100"\nlevel_from = "magic"')))

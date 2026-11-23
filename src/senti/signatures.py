@@ -49,6 +49,10 @@ class ParsedLine:
 
 
 def parse_line(raw: str, kind: Kind) -> ParsedLine:
+    structured = kind.log_format.structured
+    if structured and (fields := structured(raw)) is not None:
+        return ParsedLine(_parse_ts(fields.get("ts", "")), fields.get("thread", ""), fields.get("logger", ""),
+                          fields["message"], fields.get("detail", ""))
     match = kind.log_format.line.match(raw)
     if not match:
         first, _, rest = raw.partition("\n")
