@@ -1,0 +1,4 @@
+- The code is a Cargo project: `Cargo.toml` at the top (a workspace has one per crate), source in `src/` (a binary's entry point is `src/main.rs`, a library's `src/lib.rs`), tests in the same files under `#[cfg(test)]` and in `tests/`.
+- A log line is a JSON object: `timestamp`, `level`, `fields` (`message` plus the values logged with it) and `target` (the module path, such as `my_service::fx`). The message is fixed text and the values are in the fields, so look in the field values for what differed between two lines of one problem.
+- An error is usually a value in a field (`error=...`), not an exception with a stack trace. Follow it to the place that logs it (the `tracing::warn!` or `tracing::error!` with that message) and from there to where the error is created.
+- A panic is not a JSON line: it goes to standard error as plain text, with the file and line.
