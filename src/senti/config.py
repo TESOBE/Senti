@@ -215,6 +215,8 @@ class Config:
 
     build_actions_url: str  # the OBP-API build on GitHub Actions, shown at the top of the page (build.py)
     sonarcloud_project: str  # SonarCloud's key for OBP-API, read as another source of findings (sonar.py); "" for none
+    loki_tenant: str = ""  # sent to Loki as X-Scope-OrgID, if it has auth_enabled
+    loki_level_from: str = "text"  # "text": a level's lines name it; "detected_level": they carry Loki 3's level label
 
     @property
     def is_app(self) -> bool:
@@ -300,6 +302,8 @@ class Config:
             prometheus_selector=listed.prometheus if listed and not is_app else "",
             loki_url=setup.loki_url if setup else os.environ.get("LOKI_URL", "").rstrip("/"),
             loki_selector=listed.loki if listed and not is_app else "",
+            loki_tenant=setup.loki_tenant if setup else os.environ.get("LOKI_TENANT", ""),
+            loki_level_from=setup.loki_level_from if setup else os.environ.get("LOKI_LEVEL_FROM", "text"),
             service_notes=((app_service and app_service.notes)
                            or APP_NOTES + (f" Its code is in `{APPS[app].folder}/` of its checkout." if APPS[app].folder else "")
                            if is_app else obp_service.notes if listed else ""),

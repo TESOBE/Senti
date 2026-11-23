@@ -22,6 +22,7 @@ from .home import in_home
 from .kinds import KINDS
 
 SETUP_FILE = "senti.toml"
+LOKI_LEVELS_FROM = ("text", "detected_level")
 NAME = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 ENV_PREFIX = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
@@ -79,6 +80,8 @@ class Setup:
     path: str = ""  # the file it was read from; "" when it came from the environment
     prometheus_url: str = ""  # [prometheus] url: the Prometheus server Senti queries
     loki_url: str = ""  # [loki] url: the Loki server Senti queries
+    loki_tenant: str = ""  # [loki] tenant: sent as X-Scope-OrgID, for a Loki that has auth_enabled
+    loki_level_from: str = "text"  # [loki] level_from: "text" (the level word in the line) or "detected_level" (Loki 3's)
     by_service: dict = field(default_factory=dict, compare=False, repr=False)
 
     def __post_init__(self):
@@ -171,6 +174,10 @@ def parse(data: dict, path: str = "") -> Setup:
         if not isinstance(table, dict):
             raise SetupError(f"[{section}] must be a table")
         servers[section] = _text(table, "url", f"[{section}]").rstrip("/")
+    loki = data.get("loki", {})
+    level_from = _text(loki, "level_from", "[loki]") or "text"
+    if level_from not in LOKI_LEVELS_FROM:
+        raise SetupError(f"[loki]: level_from must be {' or '.join(LOKI_LEVELS_FROM)}, not {level_from!r}")
 
     by_name = {s.name: s for s in services}
     for i in instances:
@@ -192,7 +199,7 @@ def parse(data: dict, path: str = "") -> Setup:
             if section in service.sources and not servers[section]:
                 raise SetupError(f"[{section}] url is missing: service {service.name} reads {section}")
     return Setup(_text(system, "name", "[system]"), tuple(services), tuple(environments), tuple(instances), path,
-                 servers["prometheus"], servers["loki"])
+                 servers["prometheus"], servers["loki"], _text(loki, "tenant", "[loki]"), level_from)
 
 
 def load(path: Path | None = None) -> Setup | None:
@@ -226,7 +233,11 @@ def to_toml(setup: Setup) -> str:
         out.append("")
     for section in ("prometheus", "loki"):
         if url := getattr(setup, f"{section}_url"):
-            out += [f"[{section}]", f"url = {_quoted(url)}", ""]
+            out += [f"[{section}]", f"url = {_quoted(url)}"]
+            if section == "loki":
+                out += [f"{k} = {_quoted(v)}" for k, v in (("tenant", setup.loki_tenant),
+                                                           ("level_from", setup.loki_level_from)) if v and v != "text"]
+            out.append("")
     for e in setup.environments:
         out += ["[[environment]]", f"name = {_quoted(e.name)}", ""]
     for i in setup.instances:

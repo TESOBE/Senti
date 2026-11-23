@@ -2,11 +2,17 @@
 instance's lines are those of its stream selector in senti.toml, such as {app="obp-api",env="local"}.
 
 A level's lines are those whose text names it (ERROR, WARN or WARNING, ...), case aside: most log formats write the
-level as a word, and Loki 2 has no level of its own. The newest come first, as the collector expects; lines are read
-from the last hour, at most the fetch limit, so a busy service is read like OBP-API's log cache.
+level as a word, and Loki 2 has no level of its own. Loki 3 works the level out for every line (the `detected_level`
+label): with `level_from = "detected_level"` in [loki], a level's lines are those Loki gives that level, so a line that
+only mentions the word (an INFO line about an "error budget") is not counted. The newest come first, as the collector
+expects; lines are read from the last hour, at most the fetch limit, so a busy service is read like OBP-API's log cache.
+
+A Loki that has `auth_enabled` takes the tenant in a header: `tenant` in [loki]. Colour codes in a line (Rust's
+tracing and RabbitMQ write them on a terminal) are taken out, so the line reads as its kind says.
 """
 
 import os
+import re
 import time
 from typing import TYPE_CHECKING
 
@@ -20,6 +26,7 @@ if TYPE_CHECKING:
 LEVEL_WORDS = {"error": "error|fatal|severe|critical", "warning": "warn|warning", "info": "info",
                "debug": "debug", "trace": "trace"}
 WINDOW_SECONDS = 3600
+ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 
 class LokiError(Exception):
@@ -36,6 +43,8 @@ class LokiSource(Source):
 
     def query(self, level: str, limit: int) -> str:
         words = LEVEL_WORDS.get(level, level)
+        if self.config.loki_level_from == "detected_level":
+            return f'{self.config.loki_selector} | detected_level=~"{words}"'
         return f'{self.config.loki_selector} |~ "(?i)\\\\b({words})\\\\b"'
 
     def logs(self, level: str, limit: int) -> list[str]:
@@ -46,6 +55,8 @@ class LokiSource(Source):
         params = {"query": self.query(level, limit), "limit": str(limit), "direction": "backward",
                   "start": str(end - WINDOW_SECONDS * 1_000_000_000), "end": str(end)}
         headers = {"Authorization": f"Bearer {token}"} if (token := os.environ.get("LOKI_TOKEN")) else {}
+        if self.config.loki_tenant:
+            headers["X-Scope-OrgID"] = self.config.loki_tenant
         try:
             response = self.http.get(url, params=params, headers=headers)
         except httpx.HTTPError as e:
@@ -54,4 +65,4 @@ class LokiSource(Source):
             raise LokiError(f"GET {url} failed ({response.status_code}): {response.text[:300]}")
         streams = response.json().get("data", {}).get("result", [])
         lines = [(int(ts), line) for stream in streams for ts, line in stream.get("values", [])]
-        return [line for _, line in sorted(lines, key=lambda x: x[0], reverse=True)[:limit]]
+        return [ANSI.sub("", line) for _, line in sorted(lines, key=lambda x: x[0], reverse=True)[:limit]]
