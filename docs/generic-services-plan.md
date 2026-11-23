@@ -177,7 +177,7 @@ Done:
 Done, tested against answers shaped as Prometheus and Loki give them; not yet tried against a running Prometheus or Loki:
 
 - `sources/prometheus.py`: an instance's series (its selector, label matchers such as `job="obp-api",instance="localhost:9464"`) turned into meters in the shape OBP-API serves them, Micrometer's names restored (`obp_api_endpoint_requests_seconds_count` and `_sum` make the timer `obp.api.endpoint.requests`); calls, mean and longest response time per bucket from the HTTP server timer (`http_server_requests_seconds`); the running commit from an info series' `git_commit`, `vcs_ref_head_revision` or `service_version` label.
-- `sources/loki.py`: each level's newest lines from the instance's stream selector (`{app="obp-api",env="local"}`), in the last hour.
+- `sources/loki.py`: each level's newest lines from the instance's stream selector (`{app="obp-api",env="local"}`), in the last hour. `[loki] tenant` is sent as `X-Scope-OrgID` for a Loki with `auth_enabled`; `[loki] level_from = "detected_level"` takes a level's lines from the level Loki 3 works out instead of the word in the line; colour codes are removed. The `rust-tracing` kind reads the tracing crate's JSON lines.
 - A service names its `sources` in `senti.toml`, first first: each kind of data comes from the first that offers it (`["obp", "prometheus"]` keeps OBP-API's own Telemetry and adds only what obp lacks). `[prometheus] url` and `[loki] url` name the servers; `PROMETHEUS_TOKEN` and `LOKI_TOKEN`, if set, are sent as bearer tokens.
 - A service read only through Prometheus and Loki can now be listed as an instance, of any kind; OBP-API's default Telemetry prefixes and ignore pattern apply to OBP-API only.
 

@@ -54,6 +54,8 @@ discover = true
 #
 # [loki]
 # url = "http://loki:3100"
+# tenant = "1"                    # for a Loki with auth_enabled: sent as X-Scope-OrgID
+# level_from = "detected_level"   # Loki 3: a level's lines are those Loki gives that level (default "text": the line names it)
 #
 # [[service]]
 # name = "shop"
