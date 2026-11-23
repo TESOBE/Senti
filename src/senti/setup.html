@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Senti Setup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+// The theme chosen on the main page, if any
+try { const t = localStorage.getItem('sentinel-theme'); if (t) document.documentElement.dataset.theme = t; } catch {}
+</script>
+<style>
+:root {
+  --bg: #F4F5F2; --surface: #FFFFFF; --ink: #16181D; --muted: #5A5F66; --line: #D9DCD5; --accent: #0B5F5B; --good: #1E7B34; --bad: #B42318; --warn: #9A6700;
+  --sans: 'IBM Plex Sans', system-ui, sans-serif; --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121416; --surface: #1B1E21; --ink: #E8EAE4; --muted: #A2A8AE; --line: #2E3338; --accent: #4FB3AC; --good: #5CC27A; --bad: #F97066; --warn: #E3B341;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121416; --surface: #1B1E21; --ink: #E8EAE4; --muted: #A2A8AE; --line: #2E3338; --accent: #4FB3AC; --good: #5CC27A; --bad: #F97066; --warn: #E3B341;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--sans); }
+header { background: var(--surface); border-bottom: 1px solid var(--line); }
+.bar { max-width: 760px; margin: 0 auto; padding: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
+.bar strong { font-size: 18px; }
+a { color: var(--accent); }
+main { max-width: 760px; margin: 0 auto; padding: 8px 16px 64px; overflow-wrap: break-word; }
+h1 { font-size: 28px; line-height: 1.2; margin: 24px 0 8px; }
+h2 { font-size: 20px; margin: 40px 0 8px; padding-top: 16px; border-top: 1px solid var(--line); }
+h3 { font-size: 16px; margin: 24px 0 4px; }
+.lead { color: var(--muted); font-size: 18px; margin: 0 0 16px; }
+code { font: 14px var(--mono); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+pre { font: 13px/1.4 var(--mono); background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+  padding: 12px; overflow-x: auto; }
+table { border-collapse: collapse; } th, td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; }
+li { margin: 4px 0; }
+.source { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; margin-top: 40px; }
+h2:first-child, #help > h1:first-child { margin-top: 24px; }
+.brand { display: inline-flex; align-items: center; gap: 10px; }
+.ok { color: var(--good); font-weight: 600; } .bad { color: var(--bad); font-weight: 600; } .warn { color: var(--warn); font-weight: 600; }
+.sub { color: var(--muted); font-size: 14px; }
+td, th { vertical-align: top; font-size: 14px; } th { background: var(--surface); }
+.wide { width: 100%; overflow-x: auto; }
+dl.facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 8px 0; }
+dl.facts dt { color: var(--muted); } dl.facts dd { margin: 0; overflow-wrap: anywhere; }
+.instance { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px; margin: 12px 0; }
+.instance h3 { margin: 0 0 4px; }
+.instance ul { margin: 8px 0 0; padding-left: 20px; }
+button { font: 14px var(--sans); min-height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--surface); color: var(--ink); cursor: pointer; }
+button:disabled { opacity: 0.55; cursor: default; }
+main, .bar { max-width: 1000px; }
+</style>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg width='24' height='28' role='img' aria-label='Senti' viewBox='0 0 96 110' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2349B5D2'%3E%3Cg transform='rotate(25 48 21)'%3E%3Crect x='46' y='9' width='4' height='12'/%3E%3Ccircle cx='48' cy='7' r='6'/%3E%3C/g%3E%3Cpath fill-rule='evenodd' d='M48 19.5a44.5 44.5 0 1 0 0.01 0Zm0 5a39.5 39.5 0 1 1 -0.01 0Z'/%3E%3Cpath fill-rule='evenodd' d='M27 62a21 21 0 1 0 42 0a21 21 0 1 0 -42 0ZM43.5 58a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0Z'/%3E%3Ccircle cx='49.5' cy='54.5' r='3'/%3E%3C/g%3E%3C/svg%3E">
+</head>
+<body>
+<header>
+  <div class="bar">
+    <span class="brand"><svg width="24" height="28" role="img" aria-label="Senti" viewBox="0 0 96 110" xmlns="http://www.w3.org/2000/svg"><g fill="#49B5D2"><g transform="rotate(25 48 21)"><rect x="46" y="9" width="4" height="12"/><circle cx="48" cy="7" r="6"/></g><path fill-rule="evenodd" d="M48 19.5a44.5 44.5 0 1 0 0.01 0Zm0 5a39.5 39.5 0 1 1 -0.01 0Z"/><path fill-rule="evenodd" d="M27 62a21 21 0 1 0 42 0a21 21 0 1 0 -42 0ZM43.5 58a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0Z"/><circle cx="49.5" cy="54.5" r="3"/></g></svg><strong>Senti</strong></span>
+    <a href="/">Back to the suggestions</a>
+    <a href="/help">Help</a>
+  </div>
+</header>
+<main>
+<h1>Setup</h1>
+<p class="lead">What Senti watches and what it needs, read from its setup file, its <code>.env</code> and its own databases. Senti calls nothing to make this page. After you change <code>senti.toml</code> or <code>.env</code>, restart Senti and refresh this page.</p>
+<p id="error" class="bad" hidden></p>
+
+<h2>Where the setup comes from</h2>
+<dl class="facts" id="where"></dl>
+
+<h2>Claude Code</h2>
+<p class="sub">Senti runs Claude Code for the analyst, the source review, the replies to your comments and Fix this. Without it, Senti still watches but finds nothing.</p>
+<dl class="facts" id="claude"></dl>
+<p><button type="button" id="claude-check" title="Ask Claude Code one tiny question: costs a few cents">Check Claude Code</button> <span class="sub" id="claude-check-state"></span></p>
+
+<h2>Services</h2>
+<p class="sub">Each service is a piece of software Senti watches, with the checkout of its code. Fix this works in Senti's own git worktree next to the checkout, made the first time it is needed, and stages each fix in the checkout for you to commit.</p>
+<div class="wide"><table id="services">
+  <thead><tr><th>Service</th><th>Checkout</th><th>Fix this</th><th>Instances</th></tr></thead>
+  <tbody></tbody>
+</table></div>
+
+<h2>Instances</h2>
+<p class="sub">Each instance is one running copy of a service, in one environment. Senti signs in as a Platform App with the OIDC client in the setting named here.</p>
+<div id="instances"></div>
+</main>
+<script>
+// Everything shown is set as text, never as HTML: problems may quote what a service answered
+const $ = (id) => document.getElementById(id);
+const el = (tag, props = {}, children = []) => {
+  const node = Object.assign(document.createElement(tag), props);
+  for (const c of children) node.append(c);
+  return node;
+};
+const mark = (good, yes, no, bad = 'bad') => el('span', { className: good ? 'ok' : bad, textContent: good ? yes : no });
+const code = (text) => el('code', { textContent: text });
+const sub = (text) => el('span', { className: 'sub', textContent: text });
+const fmtDate = (ts) => ts ? new Date(ts * 1000).toLocaleString([], { hourCycle: 'h23' }) : 'never';
+const facts = (dl, rows) => dl.replaceChildren(...rows.flatMap(([term, ...value]) => [el('dt', { textContent: term }), el('dd', {}, value)]));
+// Links into other sites only (API Manager's Platform Apps page)
+const link = (l) => l && /^https?:\/\//.test(l.href) ? [' ', el('a', { href: l.href, textContent: l.text })] : [];
+
+function renderClaude(c) {
+  const check = c.last_check;
+  facts($('claude'), [
+    ['Command', code(c.command), ' ', c.found ? sub(`(${c.found})`)
+      : mark(false, '', 'not found on the PATH of the shell that started Senti: set SENTINEL_CLAUDE_COMMAND to its full path')],
+    ['Analyst agent', code(c.agent_file), ' ', mark(c.agent_file_found, 'found', 'missing')],
+    ['Last check', check ? mark(check.ok, 'Worked', 'Failed') : sub('Not checked yet'),
+      check ? ` ${fmtDate(check.ts)}${check.model ? `, model ${check.model}` : ''}${check.error ? `: ${check.error}` : ''}` : ''],
+    ['Budget per run', Object.entries(c.budgets_usd).map(([what, usd]) => `${what} $${usd}`).join(', ')
+      + ' (in dollars at API prices; on a subscription they only stop a run that goes on and on)'],
+    ['Analysis', c.analyse_minutes > 0 ? `every ${c.analyse_minutes} minutes, when there is something new` : 'turned off (SENTINEL_ANALYSE_MINUTES=0)'],
+  ]);
+}
+
+function renderServices(services) {
+  $('services').tBodies[0].replaceChildren(...services.map((s) => {
+    const fix = s.fix_unavailable
+      ? [mark(false, '', 'Not available'), ` ${s.fix_unavailable}.`]
+      : [mark(true, 'Available', ''),
+         el('br'), 'Builds with ', code(s.build_tool), ' ', mark(s.build_tool_found, 'found', 'not found on the PATH'),
+         el('br'), 'Worktree ', code(s.worktree), ' ', sub(s.worktree_made ? '(made)' : '(made on the first fix)')];
+    return el('tr', {}, [
+      el('td', {}, [el('strong', { textContent: s.name }), el('br'), sub(`${s.kind}: ${s.kind_description}`)]),
+      el('td', {}, s.checkout
+        ? [code(s.checkout), ...(s.checkout_is_git ? [] : [' ', mark(false, '', 'not a git checkout')]),
+           ...(s.folder ? [el('br'), 'Its code is in ', code(`${s.folder}/`)] : []),
+           ...(s.repository ? [el('br'), sub(s.repository)] : [])]
+        : [mark(false, '', 'No checkout'), ' Set its source in senti.toml, so the analyst can read the code.']),
+      el('td', {}, fix),
+      el('td', { textContent: s.instances.join(', ') }),
+    ]);
+  }));
+}
+
+function renderInstances(instances) {
+  $('instances').replaceChildren(...instances.map((i) => {
+    const problems = i.problems.map((p) => el('li', {}, [
+      el('span', { className: p.severity === 'warn' ? 'warn' : 'bad', textContent: p.title }),
+      p.sources && p.sources.length ? sub(` (${p.sources.join(', ')})`) : '',
+      p.action ? `: ${p.action}` : '', ...link(p.link)]));
+    const rows = [['Service', i.service], ['Environment', i.environment], ['URL', i.url],
+      ...(i.parent ? [['Listed by', `${i.parent}'s app directory`]] : []),
+      ['Read through', i.reads_from.join(', ')],
+      ['OIDC', `${i.oidc_issuer}, with the client in the setting ${i.oidc_client_setting}`],
+      ['Last good poll', fmtDate(i.last_poll)]];
+    return el('div', { className: 'instance' }, [
+      el('h3', {}, [i.name, ' ', mark(i.connected, 'Connected', 'Not connected')]),
+      el('dl', { className: 'facts' }, rows.flatMap(([t, v]) => [el('dt', { textContent: t }), el('dd', { textContent: v })])),
+      problems.length ? el('ul', {}, problems) : el('p', { className: 'ok', textContent: 'Nothing to fix.' }),
+      i.more_may_follow ? el('p', { className: 'sub', textContent: 'More may follow once this is fixed: until Senti can sign in, OBP-API cannot say what else is missing.' }) : '',
+    ]);
+  }));
+}
+
+async function load() {
+  try {
+    const response = await fetch('/api/setup');
+    const s = await response.json();
+    if (!response.ok) throw new Error(s.error || response.statusText);
+    $('error').hidden = true;
+    facts($('where'), [
+      ["Senti's folder", code(s.home)],
+      ['Setup file', ...(s.setup_file ? [code(s.setup_file)] : ['None: the setup comes from ', code('.env'), ' (SENTINEL_INSTANCES). ',
+        code('senti config import-env --write'), ' saves it as ', code(s.setup_file_expected), '.'])],
+      ...(s.system ? [['System', s.system]] : []),
+      ['Settings and secrets', code(s.env_file), ' ', mark(s.env_file_found, 'found', 'missing')],
+      ['This page', s.ui],
+    ]);
+    renderClaude(s.claude);
+    renderServices(s.services);
+    renderInstances(s.instances);
+  } catch (e) {
+    $('error').hidden = false;
+    $('error').textContent = `Could not read the setup: ${e.message}`;
+  }
+}
+
+$('claude-check').addEventListener('click', async () => {
+  $('claude-check').disabled = true;
+  $('claude-check-state').textContent = 'Asking Claude Code one tiny question…';
+  try {
+    const response = await fetch('/api/claude-check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    const r = await response.json();
+    $('claude-check-state').textContent = !response.ok ? `Could not check: ${r.error}` : r.ok ? `Worked in ${r.seconds} seconds.` : `Failed: ${r.error}`;
+    await load();
+  } catch (e) {
+    $('claude-check-state').textContent = `Could not check: ${e.message}`;
+  } finally {
+    $('claude-check').disabled = false;
+  }
+});
+
+load();
+</script>
+</body>
+</html>

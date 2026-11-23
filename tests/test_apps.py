@@ -1,16 +1,21 @@
-"""Watching an app (API Explorer II, the API Manager, the Portal, OBP-OIDC) through its own /monitoring endpoints."""
+"""Watching an app (API Explorer II, the API Manager, the Portal, OBP-OIDC, the Sandbox Populator) through its own /monitoring endpoints."""
 
 from dataclasses import replace
 
 import httpx
 
-from obp_sentinel.collector import Collector
-from obp_sentinel import config as config_module
-from obp_sentinel.config import Config
-from obp_sentinel.health import health
-from obp_sentinel.obp_client import OBPClient
-from obp_sentinel.signatures import parse_line, signature_of
-from obp_sentinel.store import Store
+from senti.collector import Collector
+from senti import config as config_module
+from senti.config import Config
+from senti.health import health
+from senti.sources import source_for
+from senti.packs.obp.app_source import ObpAppSource
+from senti.kinds import kind_of
+from senti.signatures import parse_line, signature_of
+from senti.store import Store
+from senti.home import in_home
+
+OBP = kind_of("obp-api")
 
 
 def test_each_instance_has_the_apps_its_app_directory_lists_using_its_settings(config, monkeypatch, app_directories):
@@ -27,19 +32,24 @@ def test_each_instance_has_the_apps_its_app_directory_lists_using_its_settings(c
     app_directories["http://localhost:8080"] = {
         "public_obp_api_explorer_url": "http://localhost:5173/", "public_obp_portal_url": "http://localhost:5174",
         "public_obp_oidc_url": "http://localhost:9000",
-        "public_obp_hola_url": "http://localhost:8087"}  # not an app Sentinel watches
+        "public_obp_sandbox_populator_url": "http://localhost:5178/",
+        "public_obp_hola_url": "http://localhost:8087"}  # not an app Senti watches
     app_directories["https://obp.ogcr"] = {"public_obp_api_explorer_url": "https://explorer.ogcr"}
     configs = {c.name: c for c in Config.all_from_env()}
-    assert list(configs) == ["local", "local-explorer", "local-portal", "local-oidc", "ogcr", "ogcr-explorer"]
+    assert list(configs) == ["local", "local-explorer", "local-portal", "local-oidc", "local-populator", "ogcr",
+                             "ogcr-explorer"]
     assert not configs["local"].is_app and configs["local"].telemetry_prefixes == ["obp.api."]
     explorer, portal, ogcr_explorer = configs["local-explorer"], configs["local-portal"], configs["ogcr-explorer"]
     assert (explorer.parent, explorer.obp_base_url, explorer.monitoring_path) == ("local", "http://localhost:5173", "/api/monitoring")
     assert portal.monitoring_path == "/monitoring" and portal.obp_api_source == "/src/frontend"
     assert explorer.obp_api_source == "/src/explorer" and explorer.oidc_client_id == "local-client"
-    assert ogcr_explorer.oidc_client_id == "ogcr-client" and ogcr_explorer.db_path == "sentinel-ogcr-explorer.db"
+    assert ogcr_explorer.oidc_client_id == "ogcr-client" and ogcr_explorer.db_path == in_home("sentinel-ogcr-explorer.db")
     assert explorer.telemetry_prefixes == [] and ogcr_explorer.ignore_regex == "monitoring/"
     oidc = configs["local-oidc"]
     assert (oidc.obp_base_url, oidc.monitoring_path, oidc.obp_api_source) == ("http://localhost:9000", "/monitoring", "/src/oidc")
+    populator = configs["local-populator"]
+    assert (populator.obp_base_url, populator.monitoring_path, populator.obp_api_source) == (
+        "http://localhost:5178", "/monitoring", "/src/frontend")
 
 
 def test_apps_found_before_are_kept_when_obp_api_cannot_be_reached(config, monkeypatch, app_directories):
@@ -69,7 +79,7 @@ def test_the_client_reads_the_apps_monitoring_endpoints_with_the_same_token(conf
             return httpx.Response(200, json={"api_instance_id": "api-explorer-ii_x", "git_commit": "abc", "meters": []})
         return httpx.Response(404)
 
-    client = OBPClient(app, httpx.Client(transport=httpx.MockTransport(handler)))
+    client = source_for(app, httpx.Client(transport=httpx.MockTransport(handler)))
     assert client.log_cache("error", 10) == ["boom"]
     assert client.telemetry()["git_commit"] == "abc"
     monitoring = [c for c in calls if c.url.path.startswith("/api/monitoring")]
@@ -77,7 +87,9 @@ def test_the_client_reads_the_apps_monitoring_endpoints_with_the_same_token(conf
     assert all(c.headers["authorization"] == "Bearer tok" for c in monitoring)
 
 
-class AppClient:
+class AppClient(ObpAppSource):
+    """The obp-app source, answering from memory instead of the app."""
+
     def log_cache(self, level, limit):
         return ["[2026-10-10T20:16:18.632Z] [ERROR] [Proxy] GET /obp/v6.0.0/banks/gh.29.uk → 500"]
 
@@ -89,14 +101,20 @@ class AppClient:
     def status_without_token(self, url):
         return 401
 
-    def __getattr__(self, name):  # root, metrics, reach and Scope declaration are OBP-API's only
-        raise AssertionError(f"an app has no {name}")
+    def root(self):
+        raise AssertionError("an app has no root endpoint")
+
+    def aggregate_metrics(self, from_ts, to_ts):
+        raise AssertionError("an app has no aggregate metrics")
+
+    def declare_platform_app(self):
+        raise AssertionError("an app's Scopes are declared by its OBP-API instance's source")
 
 
 def test_an_app_is_polled_for_logs_and_telemetry_only(config, tmp_path):
     app = replace(config, monitoring_path="/monitoring", telemetry_prefixes=[], ignore_regex="monitoring/")
     store = Store(str(tmp_path / "app.db"))
-    Collector(app, store, AppClient()).poll_once()
+    Collector(app, store, AppClient(app)).poll_once()
     assert [r["source"] for r in store.db.execute("SELECT source FROM polls ORDER BY id")] == ["log:error", "telemetry"]
     assert store.db.execute("SELECT COUNT(*) FROM telemetry_values").fetchone()[0] == 1
     assert store.db.execute("SELECT git_commit FROM deployments").fetchone()[0] == "1a2b3c4"
@@ -117,9 +135,9 @@ def test_javascript_errors_are_recognised():
         ("Error fetching resource docs Error: connect ECONNREFUSED 127.0.0.1:8080\n    at TCPConnectWrap", "Error"),
         ("[2026-10-10T20:16:18.632Z] [ERROR] [Opey] OBPAPIError: OBP-20006", "OBPAPIError"),
     ]:
-        assert signature_of("error", parse_line(raw)).exception == exception
-    a = signature_of("error", parse_line("TypeError: fetch failed\n    at a (x.js:1:2)"))
-    b = signature_of("error", parse_line("TypeError: fetch failed\n    at b (y.js:9:9)"))
+        assert signature_of("error", parse_line(raw, OBP), OBP).exception == exception
+    a = signature_of("error", parse_line("TypeError: fetch failed\n    at a (x.js:1:2)", OBP), OBP)
+    b = signature_of("error", parse_line("TypeError: fetch failed\n    at b (y.js:9:9)", OBP), OBP)
     assert a.id == b.id  # the stack is not part of the signature
 
 
@@ -158,7 +176,8 @@ REFUSED = ('GET http://explorer/api/monitoring/telemetry failed (403): '
 class RefusingAppClient(AppClient):
     """An app that answers 403, and an OBP-API that says what `held` holds."""
 
-    def __init__(self, held):
+    def __init__(self, config, held):
+        super().__init__(config)
         self.held, self.asked = held, []
 
     def log_cache(self, level, limit):
@@ -184,8 +203,9 @@ def app_config(config):
 
 def test_when_an_app_refuses_sentinel_obp_api_is_asked_about_each_refused_role(config, tmp_path):
     store = Store(str(tmp_path / "app.db"))
-    client = RefusingAppClient(held={"CanGetTelemetry"})
-    Collector(app_config(config), store, client).poll_once()
+    app = app_config(config)
+    client = RefusingAppClient(app, held={"CanGetTelemetry"})
+    Collector(app, store, client).poll_once()
     assert sorted(client.asked) == ["CanGetSystemLogCacheAll", "CanGetSystemLogCacheError", "CanGetTelemetry"]
     access = store.get_state("app_access")
     assert access["consumer_id"] == "c1" and access["roles"]["CanGetTelemetry"]["consumer"]
@@ -195,7 +215,7 @@ def test_when_an_app_refuses_sentinel_obp_api_is_asked_about_each_refused_role(c
 def test_an_app_refusing_roles_obp_api_allows_is_a_disagreement_not_missing_scopes(config, tmp_path):
     app = app_config(config)
     store = Store(str(tmp_path / "app.db"))
-    Collector(app, store, RefusingAppClient(held={"CanGetTelemetry"})).poll_once()
+    Collector(app, store, RefusingAppClient(app, held={"CanGetTelemetry"})).poll_once()
     problems = {p["key"]: p for p in health(store, app)["problems"]}
     assert set(problems) == {"missing-scopes", "app-disagrees"}
     disagrees = problems["app-disagrees"]

@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Senti Help</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+// The theme chosen on the main page, if any
+try { const t = localStorage.getItem('sentinel-theme'); if (t) document.documentElement.dataset.theme = t; } catch {}
+</script>
+<style>
+:root {
+  --bg: #F4F5F2; --surface: #FFFFFF; --ink: #16181D; --muted: #5A5F66; --line: #D9DCD5; --accent: #0B5F5B;
+  --sans: 'IBM Plex Sans', system-ui, sans-serif; --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121416; --surface: #1B1E21; --ink: #E8EAE4; --muted: #A2A8AE; --line: #2E3338; --accent: #4FB3AC;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121416; --surface: #1B1E21; --ink: #E8EAE4; --muted: #A2A8AE; --line: #2E3338; --accent: #4FB3AC;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--sans); }
+header { background: var(--surface); border-bottom: 1px solid var(--line); }
+.bar { max-width: 760px; margin: 0 auto; padding: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
+.bar strong { font-size: 18px; }
+a { color: var(--accent); }
+main { max-width: 760px; margin: 0 auto; padding: 8px 16px 64px; overflow-wrap: break-word; }
+h1 { font-size: 28px; line-height: 1.2; margin: 24px 0 8px; }
+h2 { font-size: 20px; margin: 40px 0 8px; padding-top: 16px; border-top: 1px solid var(--line); }
+h3 { font-size: 16px; margin: 24px 0 4px; }
+.lead { color: var(--muted); font-size: 18px; margin: 0 0 16px; }
+code { font: 14px var(--mono); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+pre { font: 13px/1.4 var(--mono); background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+  padding: 12px; overflow-x: auto; }
+table { border-collapse: collapse; } th, td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; }
+li { margin: 4px 0; }
+.source { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; margin-top: 40px; }
+h2:first-child, #help > h1:first-child { margin-top: 24px; }
+.brand { display: inline-flex; align-items: center; gap: 10px; }
+</style>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg width='24' height='28' role='img' aria-label='Senti' viewBox='0 0 96 110' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2349B5D2'%3E%3Cg transform='rotate(25 48 21)'%3E%3Crect x='46' y='9' width='4' height='12'/%3E%3Ccircle cx='48' cy='7' r='6'/%3E%3C/g%3E%3Cpath fill-rule='evenodd' d='M48 19.5a44.5 44.5 0 1 0 0.01 0Zm0 5a39.5 39.5 0 1 1 -0.01 0Z'/%3E%3Cpath fill-rule='evenodd' d='M27 62a21 21 0 1 0 42 0a21 21 0 1 0 -42 0ZM43.5 58a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0Z'/%3E%3Ccircle cx='49.5' cy='54.5' r='3'/%3E%3C/g%3E%3C/svg%3E">
+</head>
+<body>
+<header>
+  <div class="bar">
+    <span class="brand"><svg width="24" height="28" role="img" aria-label="Senti" viewBox="0 0 96 110" xmlns="http://www.w3.org/2000/svg"><g fill="#49B5D2"><g transform="rotate(25 48 21)"><rect x="46" y="9" width="4" height="12"/><circle cx="48" cy="7" r="6"/></g><path fill-rule="evenodd" d="M48 19.5a44.5 44.5 0 1 0 0.01 0Zm0 5a39.5 39.5 0 1 1 -0.01 0Z"/><path fill-rule="evenodd" d="M27 62a21 21 0 1 0 42 0a21 21 0 1 0 -42 0ZM43.5 58a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0Z"/><circle cx="49.5" cy="54.5" r="3"/></g></svg><strong>Senti</strong></span>
+    <a href="/">Back to the suggestions</a>
+    <a href="/setup">Setup</a>
+  </div>
+</header>
+<main>
+<section id="buttons">
+<h1>Buttons on a finding</h1>
+<h3>How much it matters to you</h3>
+<ul>
+  <li><strong>Relevant</strong>, <strong>Important</strong> and <strong>Urgent</strong> say how much a finding matters
+    to you. The finding stays where it is. Senti learns from them and shows first the kinds of finding you rate:
+    Important counts twice and Urgent three times. Urgent also puts the finding at the head of the Fix this queue.</li>
+  <li><strong>Skip for now</strong> snoozes the finding. It comes back later.</li>
+  <li><strong>Dismiss</strong> hides the finding and its log messages for good. Say why in the comment box first: the
+    analyst reads it and will not raise that kind of finding again.</li>
+  <li>The <strong>Your ratings</strong> tabs list the findings you gave each rating that are not done yet. On the Urgent,
+    Important and Relevant tabs, <strong>Fix all</strong> queues Fix this, with tests, for each of them. <strong>Fix all without tests</strong> does the same without running tests; CI runs them once you push.</li>
+</ul>
+<h3>History</h3>
+<ul>
+  <li><strong>Trace history</strong> lists the commits that changed the lines the finding names, back into the Lift
+    code. Claude then says which commit introduced the problem.</li>
+</ul>
+<h3>Acting on a finding</h3>
+<p>What each button leads to is shown underneath it.</p>
+<ul>
+  <li><strong>Save comment</strong> keeps your comment with the finding, and Senti answers it within a few minutes,
+    under the finding. Ask it anything about the finding or its fix. If you ask it to do something it can do (rate the
+    finding, skip it, dismiss it, mark it fixed, rescan it, or fix it again), it does that one thing and says so. Fix
+    it again takes a staged fix back out of your working tree first, unless you have changed those files since. Only
+    your latest comment and its answer are shown; Fix this follows every comment on the finding, and the analyst
+    reads them.</li>
+  <li><strong>Fix this</strong> saves the comment box, then queues the finding. Claude fixes it in Senti's own
+    worktree of OBP-API, following your comments, and runs the tests that cover it. If they pass, Senti stages the
+    change in your working tree. Fixes are made one at a time: the next starts once you have committed or discarded
+    the one before.</li>
+  <li><strong>Fix this without tests</strong> is the same, but faster. Claude adds the test scenarios and compiles,
+    but runs no tests; they run in the cloud (CI) once you push. The fix is marked "tests not run" until then.</li>
+  <li><strong>Should be fixed now</strong> says you think it is fixed. The finding moves to Done, and the analyst
+    checks that its log errors dropped, and says so if not.</li>
+  <li><strong>Rescan</strong> has Claude read the code the instance runs now and answer in one
+    line. If Claude finds it fixed, naming the commit that fixed it, the finding moves to Done. Any other answer
+    changes nothing. It reads the deployed commit, so a fix you have committed but not deployed still shows as an
+    issue.</li>
+  <li>If <strong>Fix this</strong> finds that a commit has already fixed the problem, it changes nothing and moves
+    the finding to Done, naming that commit.</li>
+</ul>
+<h3>A fix in your working tree</h3>
+<p>Under Fix this, <strong>Now</strong> says where the fix is today, read from git each time you open the finding:
+  staged and not committed, committed and not pushed, pushed but not yet running on the instance, or running there.
+  <strong>What Senti did</strong> is Claude's report from the time of the fix, and does not change. Staged means
+  waiting for the next commit: git add (or Stage) puts changes there, and git commit saves them.</p>
+<p>Review the change in your IDE and change it if you like. Senti commits only when you press Commit.</p>
+<ul>
+  <li><strong>Stage</strong> adds the fix's files again, with any changes you made to them.</li>
+  <li><strong>Unstage</strong> takes them out of what is staged. Your changes stay in the files. Unstaging in your
+    IDE does the same.</li>
+  <li><strong>Commit</strong> commits what is staged, with the one-line message shown. It refuses if files other
+    than the fix's are staged. The finding then moves to Done, and the next queued fix starts.</li>
+  <li><strong>Copy the commands</strong> copies the same git commands, to run in a terminal instead.</li>
+  <li><strong>Discard</strong> takes the fix back out of your working tree. The next queued fix then starts.</li>
+</ul>
+<h3>Findings from SonarCloud</h3>
+<p>A finding whose evidence starts "SonarCloud reports" comes from SonarCloud's analysis of OBP-API, read every hour.
+  Senti keeps only security issues, security hotspots, serious reliability issues and new issues on your pull
+  request. Each links to the issue on SonarCloud. Static analysis can be wrong, so read the code before you press Fix
+  this. When SonarCloud stops reporting it, the finding moves to Done.</p>
+</section>
+<section id="about">
+<h2>About Senti</h2>
+<div id="help"><p class="lead">Loading the OBP-Sentinel glossary item from OBP-API…</p></div>
+<p class="source" id="source"></p>
+</section>
+</main>
+<script>
+// When Senti watches OBP-API, the text is its glossary item OBP-Sentinel (packs/obp/help.py). Only plain text formatting
+// is kept from its HTML. Without OBP-API there is nothing to show, and the section is hidden.
+const KEEP = new Set(['H1', 'H2', 'H3', 'H4', 'P', 'UL', 'OL', 'LI', 'STRONG', 'B', 'EM', 'I', 'CODE', 'PRE', 'A',
+                      'BLOCKQUOTE', 'BR', 'TABLE', 'THEAD', 'TBODY', 'TR', 'TH', 'TD']);
+function clean(node) {
+  const out = document.createDocumentFragment();
+  for (const child of node.childNodes) {
+    if (child.nodeType === Node.TEXT_NODE) { out.append(child.textContent); continue; }
+    if (child.nodeType !== Node.ELEMENT_NODE) continue;
+    if (!KEEP.has(child.tagName)) { out.append(clean(child)); continue; }
+    const copy = document.createElement(child.tagName);
+    const href = child.tagName === 'A' && child.getAttribute('href');
+    if (href && /^https?:\/\//.test(href)) copy.href = href;  // links into other sites only: relative ones would point here
+    copy.append(clean(child));
+    out.append(copy);
+  }
+  return out;
+}
+(async () => {
+  const help = await fetch('/api/help').then((r) => r.json()).catch((e) => ({ error: e.message }));
+  if (help.none) {
+    document.getElementById('about').hidden = true;
+    return;
+  }
+  if (help.error) {
+    document.getElementById('help').replaceChildren(Object.assign(document.createElement('p'), {
+      textContent: `Could not read the OBP-Sentinel glossary item from OBP-API: ${help.error}. ` +
+        'This OBP-API may be older than the version that added it. The README describes Senti too.' }));
+  } else {
+    document.getElementById('help').replaceChildren(clean(new DOMParser().parseFromString(help.html, 'text/html').body));
+  }
+  const source = document.getElementById('source');
+  if (help.link) {
+    source.replaceChildren("From OBP-API's glossary: ", Object.assign(document.createElement('a'),
+      { href: help.link, textContent: 'OBP-Sentinel in API Explorer' }));
+  } else if (help.url) {
+    source.textContent = `From OBP-API's glossary: ${help.url}`;
+  }
+})();
+</script>
+</body>
+</html>

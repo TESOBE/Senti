@@ -8,9 +8,9 @@ from http.server import ThreadingHTTPServer
 
 import pytest
 
-from obp_sentinel.store import Store
-from obp_sentinel import web
-from obp_sentinel.web import findings, make_handler
+from senti.store import Store
+from senti import web
+from senti.web import findings, make_handler
 
 
 def finding(key, priority_inputs=(4, 0.8, 1, "rising")):
@@ -50,7 +50,7 @@ def request(port, method, path, body=None, headers=None):
 
 def test_page_and_findings(server):
     status, page = request(server, "GET", "/")
-    assert status == 200 and b"<title>Sentinel</title>" in page
+    assert status == 200 and b"<title>Senti</title>" in page
     status, data = request(server, "GET", "/api/findings")
     items = json.loads(data)
     assert status == 200 and items[0]["key"] == "one" and items[0]["files"] == ["a.scala:1"]
@@ -59,17 +59,33 @@ def test_page_and_findings(server):
     status, data = request(server, "GET", "/api/source")
     source = json.loads(data)
     assert status == 200 and source["total"] == 0 and source["instances"] == [{"name": "default", "listed_at": None}]
-    assert source["scanner"]["on"] is False and source["scanner"]["scans"] == []
+    assert source["scanner"]["on"] is True and source["scanner"]["scans"] == []  # on from the start
 
 
 def test_the_fixed_page_is_served(server):
     status, page = request(server, "GET", "/fixed")
-    assert status == 200 and b"<title>Sentinel Fixed</title>" in page
+    assert status == 200 and b"<title>Senti Fixed</title>" in page
+
+
+def test_the_setup_page_shows_services_instances_and_claude_code_without_secrets(server, config):
+    status, page = request(server, "GET", "/setup")
+    assert status == 200 and b"<title>Senti Setup</title>" in page
+    status, data = request(server, "GET", "/api/setup")
+    setup = json.loads(data)
+    assert status == 200 and setup["claude"]["command"] == config.claude_command
+    assert [s["name"] for s in setup["services"]] == [config.service]
+    assert setup["services"][0]["instances"] == [config.name] and "fix_unavailable" in setup["services"][0]
+    instance = setup["instances"][0]
+    assert instance["name"] == config.name and instance["oidc_client_setting"] == config.oidc_client_setting
+    assert all(p["title"] for p in instance["problems"]) and instance["connected"] is False  # never polled
+    # The client's id and secret are never on the page, only the name of the setting that holds them
+    for secret in (config.oidc_client_id, config.oidc_client_secret):
+        assert not secret or secret not in data.decode()
 
 
 def test_help_reads_the_glossary_item_from_obp_api(server, config, monkeypatch):
     status, page = request(server, "GET", "/help")
-    assert status == 200 and b"<title>Sentinel Help</title>" in page
+    assert status == 200 and b"<title>Senti Help</title>" in page
     asked = []
 
     class Answer:
@@ -151,7 +167,7 @@ def test_evidence_commits_get_date_and_author(config, tmp_path):
 
 
 def test_some_action_taken_is_recorded_and_not_suggested_again(server, config):
-    from obp_sentinel.digest import eligible_findings
+    from senti.digest import eligible_findings
 
     status, _ = request(server, "POST", "/api/findings/1/feedback", {"verdict": "acted", "comment": "added a cap"},
                         {"Content-Type": "application/json"})
@@ -190,7 +206,7 @@ def test_each_instance_has_its_own_findings(config, tmp_path):
 
 
 def test_instances_show_running_commit_age_and_problems(server, config, monkeypatch):
-    from obp_sentinel import web
+    from senti import web
 
     monkeypatch.setattr(web, "github_commit_info", lambda repo, sha: {"ts": 1791000000, "author": "A"} if sha == "abc1234" else None)
     store = Store(config.db_path)
@@ -206,7 +222,7 @@ def test_instances_show_running_commit_age_and_problems(server, config, monkeypa
 
 
 def test_feedback_given_on_the_page_can_be_undone(config):
-    from obp_sentinel.store import Store
+    from senti.store import Store
     store = Store(config.db_path)
     fid = store.upsert_finding({"key": "k", "title": "t", "category": "bug", "signature_ids": [], "evidence": "e",
                                 "hypothesis": "h", "files": [], "suggested_fix": "f", "impact": 1, "confidence": 0.5,
@@ -216,8 +232,124 @@ def test_feedback_given_on_the_page_can_be_undone(config):
     assert store.undo_feedback(fid) == "fixed"
     assert store.db.execute("SELECT status FROM findings WHERE id = ?", (fid,)).fetchone()[0] == "open"
     assert store.db.execute("SELECT COUNT(*) FROM feedback WHERE finding_id = ?", (fid,)).fetchone()[0] == 0
-    store.add_feedback(fid, "fixed", "Fix this: committed abc on develop: x", 7)  # recorded by Sentinel: not undone
+    store.add_feedback(fid, "fixed", "Fix this: committed abc on develop: x", 7)  # recorded by Senti: not undone
     import pytest
     with pytest.raises(ValueError):
         store.undo_feedback(fid)
     store.close()
+
+
+def test_responses_change_the_order_until_forgotten(server, config):
+    from senti import preferences
+    preferences.clear()
+    json_headers = {"Content-Type": "application/json"}
+    store = Store(config.db_path)
+    for key in ("b", "c", "d"):
+        store.add_feedback(store.upsert_finding(finding(key)), "relevant", None, 7)
+    store.commit()
+    store.close()
+    learned = json.loads(request(server, "GET", "/api/preferences")[1])
+    assert learned["categories"]["bug"] == {"acted": 3, "urgent": 0, "dismissed": 0, "weight": 1.3}
+    assert learned["high_impact"] == preferences.HIGH_IMPACT
+    one = next(f for f in json.loads(request(server, "GET", "/api/findings")[1]) if f["key"] == "one")
+    assert one["rank"] == round(one["priority"] * 1.3, 3)
+    status, data = request(server, "POST", "/api/preferences/forget", {}, json_headers)
+    assert status == 200 and json.loads(data)["categories"] == {}
+    one = next(f for f in json.loads(request(server, "GET", "/api/findings")[1]) if f["key"] == "one")
+    assert one["rank"] == one["priority"]
+
+
+def test_urgent_puts_the_finding_at_the_head_of_the_fix_queue(server, config, monkeypatch):
+    from senti import fixer
+    monkeypatch.setattr(fixer, "unavailable_reason", lambda config: None)
+    monkeypatch.setattr(web, "unavailable_reason", lambda config, scheduled=True: None)
+    monkeypatch.setattr(fixer, "start", lambda config: None)
+    json_headers = {"Content-Type": "application/json"}
+    status, data = request(server, "POST", "/api/findings/1/feedback", {"verdict": "urgent"}, json_headers)
+    assert status == 200 and json.loads(data) == {"ok": True, "fix_status": "queued"}
+    store = Store(config.db_path)
+    f = store.findings()[0]
+    assert (f["status"], f["fix_status"], f["fix_at"]) == ("open", "queued", 0)
+    store.close()
+
+
+def test_urgent_says_why_it_was_not_queued(server, config, monkeypatch):
+    from senti import fixer
+    monkeypatch.setattr(fixer, "unavailable_reason", lambda config: "No OBP-API checkout")
+    status, data = request(server, "POST", "/api/findings/1/feedback", {"verdict": "urgent"},
+                           {"Content-Type": "application/json"})
+    assert json.loads(data) == {"ok": True, "not_queued": "No OBP-API checkout"}
+
+
+def test_findings_carry_the_latest_rating_for_the_pressed_button(server, config):
+    json_headers = {"Content-Type": "application/json"}
+    rating = lambda: json.loads(request(server, "GET", "/api/findings")[1])[0]["rating"]
+    assert rating() is None
+    request(server, "POST", "/api/findings/1/feedback", {"verdict": "important"}, json_headers)
+    request(server, "POST", "/api/findings/1/feedback", {"verdict": "comment", "comment": "soon"}, json_headers)
+    assert rating() == "important"  # a comment leaves the rating as it was
+    request(server, "POST", "/api/findings/1/feedback", {"verdict": "later"}, json_headers)
+    assert rating() == "later"
+
+
+def test_fix_the_rated_findings_from_the_page(server, config, monkeypatch):
+    from senti import fixer
+    json_headers = {"Content-Type": "application/json"}
+    request(server, "POST", "/api/findings/1/feedback", {"verdict": "relevant"}, json_headers)
+    assert json.loads(request(server, "GET", "/api/findings")[1])[0]["to_fix"] is True
+    status, data = request(server, "POST", "/api/fix-queue/fix-all-rated", {}, json_headers)
+    assert status == 400  # which rating is missing
+    status, data = request(server, "POST", "/api/fix-queue/fix-all-rated", {"rating": "relevant", "tests": "no"}, json_headers)
+    assert status == 400  # tests must be true or false
+    status, data = request(server, "POST", "/api/fix-queue/fix-all-rated", {"rating": "relevant"}, json_headers)
+    assert status == 409 and "OBP_API_SOURCE" in json.loads(data)["error"]  # no OBP-API checkout in tests
+    monkeypatch.setattr(fixer, "unavailable_reason", lambda config: None)
+    monkeypatch.setattr(web, "unavailable_reason", lambda config, scheduled=True: None)
+    monkeypatch.setattr(fixer, "start", lambda config: None)
+    status, data = request(server, "POST", "/api/fix-queue/fix-all-rated", {"rating": "urgent"}, json_headers)
+    assert status == 200 and json.loads(data) == {"queued": 0}  # it is rated Relevant
+    status, data = request(server, "POST", "/api/fix-queue/fix-all-rated", {"rating": "relevant"}, json_headers)
+    assert status == 200 and json.loads(data) == {"queued": 1}
+    item = json.loads(request(server, "GET", "/api/findings")[1])[0]
+    assert (item["fix_status"], item["to_fix"]) == ("queued", False)
+
+
+def serving(configs):
+    """A server for these instances; returns its port and a function that stops it."""
+    allowed = set()
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(configs, allowed))
+    port = httpd.server_address[1]
+    allowed.update({f"127.0.0.1:{port}", f"localhost:{port}"})
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    return port, lambda: (httpd.shutdown(), httpd.server_close())
+
+
+def test_each_instance_says_its_service_environment_and_findings_to_review(config, tmp_path):
+    store = Store(config.db_path)
+    suggested = store.upsert_finding(finding("one"))
+    store.upsert_finding(finding("two"))  # not suggested yet
+    store.db.execute("UPDATE findings SET status = 'suggested' WHERE id = ?", (suggested,))
+    store.commit()
+    store.close()
+    prod = replace(config, name="prod", environment="production", db_path=str(tmp_path / "prod.db"))
+    portal = replace(config, name="local-portal", parent="default", service="portal", kind="sveltekit",
+                     monitoring_path="/monitoring", db_path=str(tmp_path / "portal.db"))
+    port, stop = serving([prod, config, portal])
+    try:
+        instances = {i["name"]: i for i in json.loads(request(port, "GET", "/api/instances")[1])}
+    finally:
+        stop()
+    assert (instances["default"]["service"], instances["default"]["environment"], instances["default"]["to_review"]) == (
+        "obp-api", "default", 1)
+    assert (instances["local-portal"]["service"], instances["local-portal"]["kind"]) == ("portal", "sveltekit")
+    # environments in the order the instances come, without senti.toml
+    assert (instances["prod"]["environment_rank"], instances["default"]["environment_rank"]) == (0, 1)
+    assert instances["prod"]["to_review"] == 0
+
+
+def test_the_help_page_shows_no_glossary_item_without_obp_api(config):
+    port, stop = serving([replace(config, name="site", service="site", kind="sveltekit")])
+    try:
+        assert json.loads(request(port, "GET", "/api/help")[1]) == {"none": True}
+    finally:
+        stop()

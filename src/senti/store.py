@@ -1,0 +1,459 @@
+"""Senti's memory: a SQLite database. All times are Unix epoch seconds (UTC)."""
+
+import json
+import re
+import sqlite3
+import time
+
+SCHEMA = """
+-- One row per poll of one source, so we know how long and how well we have been watching.
+CREATE TABLE IF NOT EXISTS polls (
+    id         INTEGER PRIMARY KEY,
+    ts         INTEGER NOT NULL,
+    source     TEXT NOT NULL,              -- 'log:error', 'log:warning', ..., 'telemetry'
+    ok         INTEGER NOT NULL,           -- 0 when the poll failed
+    fetched    INTEGER NOT NULL DEFAULT 0,
+    new        INTEGER NOT NULL DEFAULT 0,
+    gap        INTEGER NOT NULL DEFAULT 0, -- 1 when entries may have been missed since the last poll
+    error      TEXT
+);
+CREATE INDEX IF NOT EXISTS polls_ts ON polls(ts);
+
+-- One row per distinct problem.
+CREATE TABLE IF NOT EXISTS signatures (
+    id          TEXT PRIMARY KEY,
+    level       TEXT NOT NULL,
+    logger      TEXT NOT NULL,
+    exception   TEXT NOT NULL,
+    endpoint    TEXT NOT NULL,
+    template    TEXT NOT NULL,
+    first_seen  INTEGER NOT NULL,
+    last_seen   INTEGER NOT NULL,
+    total_count INTEGER NOT NULL DEFAULT 0,
+    status      TEXT NOT NULL DEFAULT 'active'  -- active | dismissed (never suggest again)
+);
+
+-- How often each signature occurred, per time bucket.
+CREATE TABLE IF NOT EXISTS observations (
+    signature_id TEXT NOT NULL REFERENCES signatures(id),
+    bucket_start INTEGER NOT NULL,
+    count        INTEGER NOT NULL,
+    PRIMARY KEY (signature_id, bucket_start)
+);
+CREATE INDEX IF NOT EXISTS observations_bucket ON observations(bucket_start);
+
+-- A few raw examples per signature, for the analyst to read.
+CREATE TABLE IF NOT EXISTS samples (
+    id           INTEGER PRIMARY KEY,
+    signature_id TEXT NOT NULL REFERENCES signatures(id),
+    ts           INTEGER NOT NULL,
+    message      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS samples_signature ON samples(signature_id);
+
+-- Which commit the instance ran, and when: from its root endpoint. A new row whenever it changes.
+CREATE TABLE IF NOT EXISTS deployments (
+    id         INTEGER PRIMARY KEY,
+    first_seen INTEGER NOT NULL,
+    last_seen  INTEGER NOT NULL,
+    git_commit TEXT
+);
+
+CREATE TABLE IF NOT EXISTS telemetry_snapshots (
+    id              INTEGER PRIMARY KEY,
+    ts              INTEGER NOT NULL,
+    api_instance_id TEXT,
+    git_commit      TEXT
+);
+CREATE INDEX IF NOT EXISTS telemetry_snapshots_ts ON telemetry_snapshots(ts);
+
+CREATE TABLE IF NOT EXISTS telemetry_values (
+    snapshot_id INTEGER NOT NULL REFERENCES telemetry_snapshots(id) ON DELETE CASCADE,
+    meter       TEXT NOT NULL,
+    type        TEXT NOT NULL,
+    tags        TEXT NOT NULL,             -- JSON object with sorted keys
+    stat        TEXT NOT NULL,             -- count | total_time | max | value | ...
+    value       REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS telemetry_values_snapshot ON telemetry_values(snapshot_id);
+
+-- OBP-API's own aggregate metrics (every API call it recorded), one row per time bucket.
+-- Only counts and times: no user, consumer or consent ids are fetched.
+CREATE TABLE IF NOT EXISTS metric_buckets (
+    bucket_start      INTEGER PRIMARY KEY,
+    count             INTEGER NOT NULL,
+    avg_ms            REAL,
+    min_ms            REAL,
+    max_ms            REAL,
+    distinct_users    INTEGER,
+    distinct_consumers INTEGER,
+    consent_calls     INTEGER,
+    distinct_consents INTEGER
+);
+
+-- The analyst's conclusions. `key` is a stable slug the analyst reuses for the same problem.
+CREATE TABLE IF NOT EXISTS findings (
+    id            INTEGER PRIMARY KEY,
+    key           TEXT NOT NULL UNIQUE,
+    created_at    INTEGER NOT NULL,
+    updated_at    INTEGER NOT NULL,
+    title         TEXT NOT NULL,
+    summary       TEXT,                    -- two or three plain sentences: what is wrong and what it means
+    category      TEXT NOT NULL,           -- bug | performance | security | reliability | readability | api-contract
+    signature_ids TEXT NOT NULL,           -- JSON list
+    evidence      TEXT NOT NULL,
+    hypothesis    TEXT NOT NULL,
+    files         TEXT NOT NULL,           -- JSON list of "path:line"
+    suggested_fix TEXT NOT NULL,
+    impact        INTEGER NOT NULL,        -- 1..5
+    confidence    REAL NOT NULL,           -- 0..1
+    effort        INTEGER NOT NULL,        -- 1..5
+    trend         TEXT NOT NULL,           -- new | rising | stable | falling
+    priority      REAL NOT NULL,
+    status        TEXT NOT NULL DEFAULT 'open',  -- open | suggested | accepted | acted | dismissed | later | fixed
+    snoozed_until INTEGER,
+    history       TEXT,                    -- JSON: per file, the commits that changed its lines (Trace history)
+    introduced    TEXT,                    -- which commit introduced the problem, as judged by Trace history
+    introduced_commit TEXT,                -- the same, split out: the commit's short hash
+    introduced_when   TEXT,                --   its author date, YYYY-MM-DD
+    introduced_who    TEXT,                --   its author
+    introduced_where  TEXT,                --   the file it changed (answers before 2026-10-19 have none)
+    trace_status  TEXT,                    -- running | done | failed
+    recheck       TEXT,                    -- whether it is still an issue, as judged by Look again
+    recheck_status TEXT,                   -- running | done | failed
+    rechecked_at  INTEGER,
+    fix_status    TEXT,                    -- queued | running | committed | skipped | failed (Fix this)
+    fix           TEXT,                    -- Fix this: the commit, or why not, and Claude's one line
+    fix_at        INTEGER,
+    fix_message   TEXT,                    -- the commit message Claude suggests, for a person to edit
+    fix_files     TEXT,                    -- JSON list of the files the staged fix changes
+    fix_patch     TEXT,                    -- the staged fix, to take it back out (Discard)
+    bug_class     TEXT,                    -- the kind of bug, for counting what was fixed (classes.py)
+    fix_tests     INTEGER,                 -- 0: Fix this without tests (the tests are left to CI); else they are run
+    reply         TEXT,                    -- the agent's answer to the person's latest comment (replies.py)
+    reply_to      TEXT,                    -- that comment
+    reply_status  TEXT,                    -- running | done | failed
+    replied_at    INTEGER,
+    needs_id      INTEGER                  -- 1: an attacker must know an id of another's object they cannot list or
+                                           -- see; lowers the priority (NEEDS_ID_WEIGHT). NULL: not judged yet
+);
+
+-- Fix this: everything Claude did for a finding's latest fix, tool results too (kind: thinking | note | tool |
+-- result | sentinel)
+CREATE TABLE IF NOT EXISTS fix_steps (
+    id         INTEGER PRIMARY KEY,
+    finding_id INTEGER NOT NULL REFERENCES findings(id),
+    ts         INTEGER NOT NULL,
+    kind       TEXT NOT NULL,
+    text       TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS fix_steps_finding ON fix_steps(finding_id);
+
+-- What was shown to people, and when.
+CREATE TABLE IF NOT EXISTS suggestions (
+    id         INTEGER PRIMARY KEY,
+    finding_id INTEGER NOT NULL REFERENCES findings(id),
+    ts         INTEGER NOT NULL,
+    digest     TEXT NOT NULL
+);
+
+-- What people said about it.
+CREATE TABLE IF NOT EXISTS feedback (
+    id         INTEGER PRIMARY KEY,
+    finding_id INTEGER NOT NULL REFERENCES findings(id),
+    ts         INTEGER NOT NULL,
+    verdict    TEXT NOT NULL,              -- relevant | important | urgent | acted | dismissed | later | fixed | comment
+                                           -- (accepted: before relevant, important and urgent)
+    comment    TEXT,
+    previous_status        TEXT,           -- the finding's status before, for Undo
+    previous_snoozed_until INTEGER,
+    from_sentinel INTEGER NOT NULL DEFAULT 0  -- 1 when Senti recorded it (Look again), not a person
+);
+
+-- Each time the analyst ran (headless Claude Code), and the steps it took: tool calls and notes, never tool results.
+CREATE TABLE IF NOT EXISTS analysis_runs (
+    id         INTEGER PRIMARY KEY,
+    started_at INTEGER NOT NULL,
+    ended_at   INTEGER,
+    trigger    TEXT NOT NULL,              -- why it ran
+    status     TEXT NOT NULL,              -- running | done | failed
+    pid        INTEGER,                    -- the Senti process running it, to tell a stale 'running' row
+    cost_usd   REAL,
+    result     TEXT,                       -- the analyst's closing reply
+    error      TEXT
+);
+
+CREATE TABLE IF NOT EXISTS analysis_steps (
+    id     INTEGER PRIMARY KEY,
+    run_id INTEGER NOT NULL REFERENCES analysis_runs(id) ON DELETE CASCADE,
+    ts     INTEGER NOT NULL,
+    kind   TEXT NOT NULL,                  -- thinking | tool | note
+    text   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS analysis_steps_run ON analysis_steps(run_id);
+
+CREATE TABLE IF NOT EXISTS state (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+"""
+
+SAMPLES_PER_SIGNATURE = 5
+TREND_WEIGHTS = {"new": 1.5, "rising": 1.3, "stable": 1.0, "falling": 0.6}
+VERDICTS = ("relevant", "important", "urgent", "acted", "dismissed", "later", "fixed")
+GRADES = ("relevant", "important", "urgent")  # how much a finding matters to the person; its status stays as it is
+UNDO_SECONDS = 600  # how long feedback given on the page can be taken back
+COMMENT = "comment"  # feedback that is only a comment from a person: the finding's status stays as it is
+CATEGORIES = {"bug", "performance", "security", "reliability", "readability", "api-contract"}
+
+
+COMMIT = re.compile(r"[0-9a-f]{7,40}")
+INTRODUCED = re.compile(r"^Introduced in (?P<commit>[0-9a-f]{7,40}) \((?P<when>\d{4}-\d{2}-\d{2}), (?P<who>[^)]+)\)"
+                        r"(?: in (?P<where>\S+?))?: ")
+
+
+def introduced_parts(answer: str | None) -> tuple[str | None, str | None, str | None, str | None]:
+    """Trace history's "Introduced in <commit> (<when>, <who>) in <where>: ..." as (commit, when, who, where);
+    all None for any other answer ("Predates ...", "Could not tell ...")."""
+    m = INTRODUCED.match(answer or "")
+    return (m["commit"], m["when"], m["who"].strip(), m["where"]) if m else (None, None, None, None)
+
+
+def now() -> int:
+    return int(time.time())
+
+
+NEEDS_ID_WEIGHT = 0.3  # a problem only an attacker who knows or guesses someone else's id can use comes later
+
+
+def priority_of(impact: int, confidence: float, effort: int, trend: str, needs_id: bool = False) -> float:
+    return round(impact * confidence * TREND_WEIGHTS[trend] / effort * (NEEDS_ID_WEIGHT if needs_id else 1), 3)
+
+
+class Store:
+    def __init__(self, path: str):
+        self.db = sqlite3.connect(path)
+        self.db.row_factory = sqlite3.Row
+        self.db.execute("PRAGMA journal_mode=WAL")
+        self.db.execute("PRAGMA foreign_keys=ON")
+        self.db.executescript(SCHEMA)
+        if "previous_status" not in {r[1] for r in self.db.execute("PRAGMA table_info(feedback)")}:
+            self.db.execute("ALTER TABLE feedback ADD COLUMN previous_status TEXT")
+            self.db.execute("ALTER TABLE feedback ADD COLUMN previous_snoozed_until INTEGER")
+        if "from_sentinel" not in {r[1] for r in self.db.execute("PRAGMA table_info(feedback)")}:
+            self.db.execute("ALTER TABLE feedback ADD COLUMN from_sentinel INTEGER NOT NULL DEFAULT 0")
+            self.db.execute("UPDATE feedback SET from_sentinel = 1 WHERE comment LIKE 'Look again: %'")
+        # A rating once marked a finding accepted (Done): put back the status it had before, where the rating is the
+        # latest response that changed it
+        latest = ("(SELECT fb.{} FROM feedback fb WHERE fb.finding_id = findings.id AND fb.verdict != 'comment' "
+                  "ORDER BY fb.id DESC LIMIT 1)")
+        rated = f"status = 'accepted' AND {latest.format('verdict')} IN ('relevant', 'important', 'urgent')"
+        if self.db.execute(f"SELECT 1 FROM findings WHERE {rated} LIMIT 1").fetchone():
+            self.db.execute(f"UPDATE findings SET status = {latest.format('previous_status')} WHERE {rated}")
+            self.db.commit()
+        have = {r[1] for r in self.db.execute("PRAGMA table_info(findings)")}
+        added = {"summary": "TEXT", "history": "TEXT", "introduced": "TEXT", "trace_status": "TEXT", "recheck": "TEXT",
+                 "recheck_status": "TEXT", "rechecked_at": "INTEGER", "fix_status": "TEXT", "fix": "TEXT",
+                 "fix_at": "INTEGER", "fix_message": "TEXT", "fix_files": "TEXT", "fix_patch": "TEXT",
+                 "introduced_commit": "TEXT", "introduced_when": "TEXT", "introduced_who": "TEXT",
+                 "introduced_where": "TEXT", "bug_class": "TEXT",
+                 "needs_id": "INTEGER", "fix_tests": "INTEGER",
+                 "reply": "TEXT", "reply_to": "TEXT", "reply_status": "TEXT", "replied_at": "INTEGER"}  # after the first databases were made
+        for column, kind in added.items():
+            if column not in have:
+                self.db.execute(f"ALTER TABLE findings ADD COLUMN {column} {kind}")
+        if "introduced_commit" not in have:  # split the answers Trace history gave before these columns
+            for r in self.db.execute("SELECT id, introduced FROM findings WHERE introduced IS NOT NULL").fetchall():
+                self.db.execute("UPDATE findings SET introduced_commit = ?, introduced_when = ?, introduced_who = ?, "
+                                "introduced_where = ? WHERE id = ?", (*introduced_parts(r["introduced"]), r["id"]))
+            self.db.commit()
+
+    def close(self) -> None:
+        self.db.close()
+
+    # --- state -------------------------------------------------------------------
+
+    def get_state(self, key: str, default=None):
+        row = self.db.execute("SELECT value FROM state WHERE key = ?", (key,)).fetchone()
+        return json.loads(row["value"]) if row else default
+
+    def set_state(self, key: str, value) -> None:
+        self.db.execute(
+            "INSERT INTO state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, json.dumps(value)),
+        )
+
+    # --- collecting ------------------------------------------------------------------
+
+    def record_poll(self, source: str, ok: bool, fetched=0, new=0, gap=False, error: str | None = None) -> None:
+        self.db.execute(
+            "INSERT INTO polls (ts, source, ok, fetched, new, gap, error) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (now(), source, int(ok), fetched, new, int(gap), error),
+        )
+
+    def record_occurrence(self, sig, ts: int, bucket_start: int, raw: str) -> None:
+        self.db.execute(
+            """INSERT INTO signatures (id, level, logger, exception, endpoint, template, first_seen, last_seen, total_count)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+               ON CONFLICT(id) DO UPDATE SET
+                 total_count = total_count + 1,
+                 first_seen = MIN(first_seen, excluded.first_seen),
+                 last_seen = MAX(last_seen, excluded.last_seen),
+                 endpoint = CASE WHEN endpoint = '' THEN excluded.endpoint ELSE endpoint END""",
+            (sig.id, sig.level, sig.logger, sig.exception, sig.endpoint, sig.template, ts, ts),
+        )
+        self.db.execute(
+            """INSERT INTO observations (signature_id, bucket_start, count) VALUES (?, ?, 1)
+               ON CONFLICT(signature_id, bucket_start) DO UPDATE SET count = count + 1""",
+            (sig.id, bucket_start),
+        )
+        kept = self.db.execute("SELECT COUNT(*) FROM samples WHERE signature_id = ?", (sig.id,)).fetchone()[0]
+        if kept < SAMPLES_PER_SIGNATURE:
+            self.db.execute(
+                "INSERT INTO samples (signature_id, ts, message) VALUES (?, ?, ?)", (sig.id, ts, raw[:4000])
+            )
+
+    def record_telemetry(self, ts: int, api_instance_id: str | None, git_commit: str | None, values: list[tuple]) -> None:
+        cur = self.db.execute(
+            "INSERT INTO telemetry_snapshots (ts, api_instance_id, git_commit) VALUES (?, ?, ?)",
+            (ts, api_instance_id, git_commit),
+        )
+        self.db.executemany(
+            "INSERT INTO telemetry_values (snapshot_id, meter, type, tags, stat, value) VALUES (?, ?, ?, ?, ?, ?)",
+            [(cur.lastrowid, *v) for v in values],
+        )
+
+    def record_deployment(self, git_commit: str | None) -> None:
+        if not COMMIT.fullmatch(git_commit or ""):  # e.g. "unknown", from an app that cannot tell which commit it runs
+            return
+        ts = now()
+        last = self.db.execute("SELECT id, git_commit FROM deployments ORDER BY id DESC LIMIT 1").fetchone()
+        if last and last["git_commit"] == git_commit:
+            self.db.execute("UPDATE deployments SET last_seen = ? WHERE id = ?", (ts, last["id"]))
+        else:
+            self.db.execute(
+                "INSERT INTO deployments (first_seen, last_seen, git_commit) VALUES (?, ?, ?)", (ts, ts, git_commit)
+            )
+
+    def record_metric_bucket(self, bucket_start: int, m: dict) -> None:
+        self.db.execute(
+            """INSERT OR REPLACE INTO metric_buckets (bucket_start, count, avg_ms, min_ms, max_ms, distinct_users,
+               distinct_consumers, consent_calls, distinct_consents) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (bucket_start, int(m.get("count") or 0), m.get("average_response_time"), m.get("minimum_response_time"),
+             m.get("maximum_response_time"), m.get("distinct_user_count"), m.get("distinct_consumer_count"),
+             m.get("consent_call_count"), m.get("distinct_consent_count")),
+        )
+
+    def prune(self, retention_days: int) -> None:
+        cutoff = now() - retention_days * 86400
+        self.db.execute("DELETE FROM telemetry_snapshots WHERE ts < ?", (cutoff,))
+        self.db.execute("DELETE FROM observations WHERE bucket_start < ?", (cutoff,))
+        self.db.execute("DELETE FROM polls WHERE ts < ?", (cutoff,))
+        self.db.execute("DELETE FROM metric_buckets WHERE bucket_start < ?", (cutoff,))
+        self.db.execute("DELETE FROM analysis_runs WHERE started_at < ? AND status != 'running'", (cutoff,))
+
+    def commit(self) -> None:
+        self.db.commit()
+
+    # --- findings, suggestions, feedback --------------------------------------------
+
+    def upsert_finding(self, f: dict) -> int:
+        """Insert or update a finding by its key. Dismissed and fixed findings keep their status."""
+        trend = f["trend"]
+        if trend not in TREND_WEIGHTS:
+            raise ValueError(f"trend must be one of {sorted(TREND_WEIGHTS)}, not {trend!r}")
+        if f["category"] not in CATEGORIES:
+            raise ValueError(f"category must be one of {sorted(CATEGORIES)}, not {f['category']!r}")
+        impact, effort, confidence = int(f["impact"]), int(f["effort"]), float(f["confidence"])
+        if not (1 <= impact <= 5 and 1 <= effort <= 5 and 0 <= confidence <= 1):
+            raise ValueError("impact and effort must be 1..5, confidence 0..1")
+        ts = now()
+        existing = self.db.execute("SELECT id, needs_id FROM findings WHERE key = ?", (f["key"],)).fetchone()
+        needs_id = f.get("needs_id")  # left as judged before when the finding does not say
+        needs_id = int(bool(needs_id)) if needs_id is not None else existing["needs_id"] if existing else None
+        fields = (
+            f["title"], f.get("summary"), f["category"], json.dumps(f.get("signature_ids", [])), f["evidence"], f["hypothesis"],
+            json.dumps(f.get("files", [])), f["suggested_fix"], impact, confidence, effort, trend, needs_id,
+            priority_of(impact, confidence, effort, trend, bool(needs_id)),
+        )
+        if existing:
+            self.db.execute(
+                """UPDATE findings SET updated_at = ?, title = ?, summary = ?, category = ?, signature_ids = ?, evidence = ?,
+                   hypothesis = ?, files = ?, suggested_fix = ?, impact = ?, confidence = ?, effort = ?, trend = ?,
+                   needs_id = ?, priority = ? WHERE id = ?""",
+                (ts, *fields, existing["id"]),
+            )
+            return existing["id"]
+        cur = self.db.execute(
+            """INSERT INTO findings (key, created_at, updated_at, title, summary, category, signature_ids, evidence,
+               hypothesis, files, suggested_fix, impact, confidence, effort, trend, needs_id, priority)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (f["key"], ts, ts, *fields),
+        )
+        return cur.lastrowid
+
+    def set_needs_id(self, finding_id: int, needs_id: bool) -> None:
+        """Record whether using the problem needs a guessed id, and work its priority out again."""
+        f = self.db.execute("SELECT * FROM findings WHERE id = ?", (finding_id,)).fetchone()
+        self.db.execute("UPDATE findings SET needs_id = ?, priority = ? WHERE id = ?",
+                        (int(needs_id), priority_of(f["impact"], f["confidence"], f["effort"], f["trend"], needs_id),
+                         finding_id))
+
+    def findings(self, statuses: tuple[str, ...] | None = None) -> list[sqlite3.Row]:
+        if statuses:
+            marks = ",".join("?" * len(statuses))
+            return self.db.execute(
+                f"SELECT * FROM findings WHERE status IN ({marks}) ORDER BY priority DESC", statuses
+            ).fetchall()
+        return self.db.execute("SELECT * FROM findings ORDER BY priority DESC").fetchall()
+
+    def add_feedback(self, finding_id: int, verdict: str, comment: str | None, snooze_days: int,
+                     from_sentinel: bool = False) -> None:
+        """`from_sentinel` marks a response Senti gives itself, which it does not learn from."""
+        finding = self.db.execute("SELECT * FROM findings WHERE id = ?", (finding_id,)).fetchone()
+        if not finding:
+            raise ValueError(f"No finding with id {finding_id}")
+        ts = now()
+        self.db.execute(
+            "INSERT INTO feedback (finding_id, ts, verdict, comment, previous_status, previous_snoozed_until, "
+            "from_sentinel) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (finding_id, ts, verdict, comment, finding["status"], finding["snoozed_until"], int(from_sentinel)),
+        )
+        if verdict == COMMENT or verdict in GRADES:  # a rating says how much it matters, not that it is done
+            return
+        snoozed_until = ts + snooze_days * 86400 if verdict == "later" else None
+        self.db.execute(
+            "UPDATE findings SET status = ?, snoozed_until = ? WHERE id = ?", (verdict, snoozed_until, finding_id)
+        )
+        if verdict == "dismissed":
+            for signature_id in json.loads(finding["signature_ids"]):
+                self.set_signature_status(signature_id, "dismissed")
+
+    def undo_feedback(self, finding_id: int, within_seconds: int = UNDO_SECONDS) -> str:
+        """Take back the latest feedback on a finding, given in the last `within_seconds`, and put the finding's
+        status back as it was. Returns the verdict taken back. Not a dismissal (its signatures were dismissed too),
+        nor what Senti recorded itself, nor what was recorded before Undo was possible."""
+        row = self.db.execute("SELECT * FROM feedback WHERE finding_id = ? ORDER BY id DESC LIMIT 1",
+                              (finding_id,)).fetchone()
+        if not row or row["ts"] < now() - within_seconds:
+            raise ValueError(f"Nothing to undo on #{finding_id} from the last {within_seconds // 60} minutes")
+        if row["verdict"] == "dismissed" or row["previous_status"] is None \
+                or (row["comment"] or "").startswith(("Fix this:", "Look again:")):
+            raise ValueError(f"The latest feedback on #{finding_id} cannot be undone")
+        self.db.execute("DELETE FROM feedback WHERE id = ?", (row["id"],))
+        self.db.execute("UPDATE findings SET status = ?, snoozed_until = ? WHERE id = ?",
+                        (row["previous_status"], row["previous_snoozed_until"], finding_id))
+        return row["verdict"]
+
+    def set_signature_status(self, signature_id: str, status: str) -> bool:
+        cur = self.db.execute("UPDATE signatures SET status = ? WHERE id = ?", (status, signature_id))
+        return cur.rowcount > 0
+
+    def suggestions_since(self, ts: int) -> int:
+        return self.db.execute("SELECT COUNT(*) FROM suggestions WHERE ts >= ?", (ts,)).fetchone()[0]
+
+    def record_suggestion(self, finding_id: int, digest: str, ts: int) -> None:
+        self.db.execute(
+            "INSERT INTO suggestions (finding_id, ts, digest) VALUES (?, ?, ?)", (finding_id, ts, digest)
+        )
+        self.db.execute("UPDATE findings SET status = 'suggested' WHERE id = ?", (finding_id,))

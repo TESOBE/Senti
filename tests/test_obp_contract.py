@@ -17,17 +17,17 @@ CONTRACT = ROOT / "obp-api-contract"
 SOURCE = ROOT / "src"
 # (file, fragment) -> why a line that names an OBP-API path is not a call of its own
 NOT_CALLS = {
-    ("src/obp_sentinel/obp_client.py", 'f"{self.config.obp_base_url}/obp/{version}/{path}"'):
+    ("src/senti/packs/obp/api_source.py", 'f"{self.config.obp_base_url}/obp/{version}/{path}"'):
         "the helper every self._request call goes through; each of those calls is listed by its own line",
-    ("src/obp_sentinel/signatures.py", "OBP_PATH_RE = re.compile("):
-        "a pattern that finds OBP-API paths in log lines",
-    ("src/obp_sentinel/health.py", "OBP_VERSION_PATH = re.compile("):
+    ("src/senti/health.py", "OBP_VERSION_PATH = re.compile("):
         "a pattern that finds OBP-API paths in the error messages the health page shows",
-    ("src/obp_sentinel/obp_client.py", "{self.config.monitoring_path}/log-cache/{level}"):
+    ("src/senti/packs/obp/app_source.py", 'self._monitoring(f"log-cache/{level}")'):
         "an app's own monitoring endpoint (see about in contract.json), not an OBP-API call",
-    ("src/obp_sentinel/obp_client.py", "{self.config.monitoring_path}/telemetry"):
+    ("src/senti/packs/obp/app_source.py", 'self._monitoring("telemetry")'):
         "an app's own monitoring endpoint (see about in contract.json), not an OBP-API call",
-    ("src/obp_sentinel/health.py", "expects a different answer from OBP-API's GET /obp/v7.0.0/banks/SYS/my/roles/ROLE"):
+    ("src/senti/packs/obp/kind.py", 'path=re.compile(r"/obp/v'):
+        "a pattern that finds OBP-API paths in log lines",
+    ("src/senti/health.py", "expects a different answer from OBP-API's GET /obp/v7.0.0/banks/SYS/my/roles/ROLE"):
         "advice shown on the health page; the call itself is listed in obp_client.py",
 }
 VERSION = re.compile(r"/obp/(v\d+\.\d+\.\d+)/")
@@ -153,8 +153,8 @@ def test_every_line_listed_as_not_a_call_still_exists():
 def test_finds_the_calls_in_the_source():
     # So an empty coverage result means "every call listed", not "no lines found"
     files = {file for file, _, _ in obp_path_lines()}
-    assert {"src/obp_sentinel/obp_client.py", "src/obp_sentinel/config.py", "src/obp_sentinel/web.py",
-            "src/obp_sentinel/collector.py"} <= files
+    assert {"src/senti/packs/obp/api_source.py", "src/senti/packs/obp/app_source.py",
+            "src/senti/packs/obp/app_directory.py", "src/senti/packs/obp/help.py"} <= files
     assert len(obp_path_lines()) >= 15
 
 

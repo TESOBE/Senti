@@ -1,0 +1,2002 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Senti</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+// The theme chosen with the header's switch, if any, before the page is drawn
+try { const t = localStorage.getItem('sentinel-theme'); if (t) document.documentElement.dataset.theme = t; } catch {}
+</script>
+<style>
+:root {
+  --bg: #F4F5F2; --surface: #FFFFFF; --ink: #16181D; --muted: #5A5F66; --line: #D9DCD5; --line-strong: #C4C8C0;
+  --accent: #0B5F5B; --danger: #9A3A0A; --good: #1E7B34; --warn: #8A5A00; --on-accent: #FFFFFF;
+  --sans: 'IBM Plex Sans', system-ui, sans-serif; --mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+/* Dark: the system's choice, unless the header's switch chose (data-theme on <html>) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121416; --surface: #1B1E21; --ink: #E8EAE4; --muted: #A2A8AE; --line: #2E3338; --line-strong: #444A50;
+    --accent: #4FB3AC; --danger: #F0925C; --good: #5CC27A; --warn: #E3B341; --on-accent: #0B0C0E;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121416; --surface: #1B1E21; --ink: #E8EAE4; --muted: #A2A8AE; --line: #2E3338; --line-strong: #444A50;
+  --accent: #4FB3AC; --danger: #F0925C; --good: #5CC27A; --warn: #E3B341; --on-accent: #0B0C0E;
+}
+:root { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--sans); }
+button, textarea { font: inherit; color: inherit; }
+a { color: var(--accent); }
+header { background: var(--surface); border-bottom: 1px solid var(--line); }
+.bar { max-width: 1280px; margin: 0 auto; padding: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px 32px; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand strong { font-size: 18px; letter-spacing: -0.01em; }
+.help-link { margin-left: auto; color: var(--accent); font-size: 14px; }
+.help-link + .help-link { margin-left: 0; }
+#theme { min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px;
+  background: none; color: var(--muted); font-size: 13px; cursor: pointer; }
+#theme:hover { color: var(--ink); border-color: var(--line-strong); }
+.sub { font-size: 13px; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.chip { padding: 6px 12px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; }
+.chip span { color: var(--muted); }
+.chip b { font-family: var(--mono); font-weight: 500; }
+.chip.guard { overflow-wrap: anywhere; }
+.where { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; }
+.connection { margin: 0; font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.connection.ok { color: var(--good); }
+.connection.bad { color: var(--bad); }
+.connection .sub { font-weight: 400; color: var(--muted); }
+details.more > summary { cursor: pointer; color: var(--muted); font-size: 14px; margin: 4px 0 12px; }
+.sources-ok { font-size: 14px; margin: 0 0 16px; }
+.sources-ok .state { margin-right: 6px; }
+.chip.guard .mark { font-family: var(--sans); font-weight: 700; }
+.chip.guard.secured { border-color: var(--good); color: var(--good); }
+.chip.guard.open { border-color: var(--bad); color: var(--bad); font-weight: 600; }
+.chip.guard.unknown { border-color: var(--warn); }
+.chip.guard.unknown .mark { color: var(--warn); }
+/* The grid of services (rows) and environments (columns); each cell holds the instances there */
+.fleet { max-width: 1280px; margin: 0 auto; padding: 6px 16px 10px; overflow-x: auto; }
+.fleet[hidden] { display: none; }
+.fleet table { border-collapse: collapse; font-size: 14px; }
+.fleet th { text-align: left; padding: 4px 16px 4px 0; font-size: 12px; font-weight: 500; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+.fleet th[scope="row"] { font-size: 14px; font-weight: 600; color: var(--ink); text-transform: none; letter-spacing: 0; }
+.fleet th[scope="row"] .kind { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
+.fleet td { padding: 3px 16px 3px 0; white-space: nowrap; }
+.fleet td button { display: inline-flex; align-items: center; gap: 2px; min-height: 32px; margin: 0 6px 0 0; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); font: inherit;
+  cursor: pointer; }
+.fleet td button:hover { border-color: var(--line-strong); }
+.fleet td button[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); font-weight: 600; }
+.fleet .count { margin-left: 6px; padding: 0 6px; border-radius: 9px; background: var(--accent); color: var(--on-accent);
+  font-size: 12px; font-weight: 600; }
+.host { max-width: 1280px; margin: 0 auto; padding: 12px 16px 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 32px; }
+#watching { font-size: 15px; overflow-wrap: anywhere; }
+#watching b { font-weight: 600; }
+main { max-width: 1280px; margin: 0 auto; padding: 24px 16px; }
+.title { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; margin-bottom: 16px; }
+h1 { margin: 0; font-size: 26px; letter-spacing: -0.015em; }
+.title p { margin: 0; color: var(--muted); font-size: 14px; }
+#learned { margin: -8px 0 16px; }
+#learned button { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; }
+nav { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 20px; }
+nav button { min-height: 44px; padding: 0 14px; border: 0; background: none; cursor: pointer; margin-bottom: -1px;
+  border-bottom: 2px solid transparent; color: var(--muted); font-weight: 500; }
+nav button[aria-pressed="true"] { border-bottom-color: var(--accent); color: var(--ink); font-weight: 600; }
+nav .rated-label { align-self: center; margin-left: 12px; padding-left: 16px; border-left: 1px solid var(--line-strong);
+  color: var(--muted); font-size: 14px; }
+nav .n { font-family: var(--mono); font-size: 13px; margin-left: 4px; }
+#suggestions { margin-bottom: 28px; }
+.cols { display: flex; flex-direction: column; gap: 20px; }
+/* The findings of the tab: a band of compact cards above the selected finding, scrolled on its own */
+.list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; max-height: 248px;
+  overflow-y: auto; padding: 2px; overscroll-behavior: contain; position: relative; }
+.list .empty { grid-column: 1 / -1; }
+.item { display: block; width: 100%; min-width: 0; overflow-wrap: break-word; text-align: left; padding: 10px 12px; border-radius: 8px; background: var(--surface);
+  border: 1px solid var(--line); cursor: pointer; }
+.item[aria-current="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.item .top { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.item .top .prio { margin-left: auto; }
+.item .top .num { font-size: 17px; font-weight: 700; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
+.cat { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.prio { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.item .t { font-weight: 600; margin-top: 4px; font-size: 14px; line-height: 1.35; display: -webkit-box;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.item .meta { display: flex; flex-wrap: wrap; gap: 2px 8px; margin-top: 4px; font-size: 12px; color: var(--muted); }
+.empty { padding: 24px; border: 1px dashed var(--line-strong); border-radius: 8px; color: var(--muted); text-align: center; }
+/* The finding on the left; its status, ratings and actions on the right, kept in view while you read */
+.d-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 400px); gap: 32px; align-items: start; }
+.d-side { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; padding: 0 4px 0 24px;
+  border-left: 1px solid var(--line); overflow-wrap: anywhere; }
+.d-side .grades { margin-top: 0; }
+.d-side .grades button { padding: 0 14px; }
+.d-side .actions button { min-width: 0; align-self: stretch; }
+.d-side .respond { border-top: 0; padding-top: 0; }
+@media (max-width: 1000px) {
+  .d-cols { grid-template-columns: minmax(0, 1fr); }
+  .d-side { position: static; max-height: none; overflow: visible; padding: 20px 0 0; border-left: 0; border-top: 1px solid var(--line); }
+}
+article { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 28px; }
+article .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; font-size: 13px; color: var(--muted); }
+article .head .num { margin: -14px 0 10px auto; font-size: 32px; font-weight: 700; line-height: 1; color: var(--ink);
+  font-variant-numeric: tabular-nums; }
+article .key { font-family: var(--mono); }
+h2 { margin: 8px 0 20px; font-size: 22px; line-height: 1.3; letter-spacing: -0.01em; }
+.titlebar { display: flex; align-items: flex-start; gap: 12px; }
+.titlebar h2 { flex: 1; }
+.summary { margin: -8px 0 20px; font-size: 16px; line-height: 1.5; }
+button.icon { flex: none; min-width: 44px; min-height: 44px; margin-top: 2px; padding: 0; display: grid; place-items: center;
+  border: 1px solid var(--line); border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
+button.icon:hover { color: var(--ink); }
+button.icon.copied { color: var(--good); }
+.scores { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; background: var(--line);
+  border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin-bottom: 24px; }
+.scores div { background: var(--surface); padding: 10px 12px; }
+.scores small { display: block; font-size: 12px; color: var(--muted); }
+.scores b { font-family: var(--mono); font-size: 20px; font-weight: 500; }
+.scores .p b { color: var(--accent); }
+@media (max-width: 560px) { .scores { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+article p { margin: 0 0 20px; white-space: pre-line; }
+.files { margin: 0 0 20px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.files li { font-family: var(--mono); font-size: 13px; overflow-wrap: anywhere; }
+.respond { border-top: 1px solid var(--line); padding-top: 20px; }
+label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+label span { font-weight: 400; color: var(--muted); }
+textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 6px; font-size: 14px;
+  resize: vertical; margin-bottom: 14px; background: var(--surface); }
+.actions { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.actions .act { display: contents; }
+.actions .act[hidden] { display: none; }
+.actions button { min-width: 240px; }
+/* What an action came to, right under its button */
+.actions .outcome { align-self: stretch; margin: -4px 0 6px; padding: 4px 0 4px 14px; border-left: 3px solid var(--line-strong); }
+.actions .outcome[hidden] { display: none; }
+.actions .outcome .previous:last-child { margin-bottom: 0; }
+.actions .outcome summary { cursor: pointer; font-size: 14px; color: var(--muted); margin: 4px 0 8px; }
+#d-state { font-weight: 600; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; }
+#d-state.good { color: var(--good); }
+#d-state.busy { color: var(--accent); }
+.grades { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.grades button { min-height: 44px; padding: 0 20px; border: 1px solid var(--line-strong); border-radius: 6px;
+  background: var(--surface); font-weight: 500; cursor: pointer; }
+.grades button:disabled { opacity: 0.5; cursor: default; }
+/* The rating given: filled green with a tick */
+.grades button[aria-pressed="true"] { background: var(--good); border-color: var(--good); color: var(--on-accent); font-weight: 600; }
+.grades button[aria-pressed="true"]::before { content: "✓ "; }
+.grades { margin-bottom: 20px; }
+.desc { font-size: 14px; color: var(--muted); }
+@media (max-width: 560px) { .actions button { align-self: stretch; } }
+.actions button { min-height: 44px; padding: 0 20px; border: 1px solid var(--line-strong); border-radius: 6px;
+  background: var(--surface); font-weight: 500; cursor: pointer; }
+.actions .primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+.actions button:disabled { opacity: 0.5; cursor: default; }
+.actions button.busy { cursor: progress; opacity: 1; }
+.actions button.done { background: var(--good); border-color: var(--good); color: var(--on-accent); opacity: 1; }
+.status { margin: 14px 0 0; font-size: 14px; color: var(--accent); min-height: 1.5em; }
+.status.error { color: var(--danger); }
+.exchange { border-left: 3px solid var(--line); padding-left: 10px; margin: 0 0 14px; }
+.exchange p { margin: 0 0 6px; white-space: pre-line; }
+.previous { font-size: 14px; color: var(--muted); margin: 0 0 14px; }
+.history { margin: 0 0 20px; }
+.history p { margin: 0 0 8px; }
+.history .file { font-family: var(--mono); font-size: 13px; margin: 8px 0 2px; overflow-wrap: anywhere; }
+.history ol { margin: 0 0 8px; padding-left: 20px; font-size: 13px; }
+.history ol li { overflow-wrap: anywhere; }
+.history .first { color: var(--muted); }
+.introduced { margin: 0 0 12px; }
+.introduced[hidden] { display: none; }
+.introduced dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0 0 8px; }
+.introduced dt { font-weight: 600; }
+.introduced dd { margin: 0; overflow-wrap: anywhere; }
+.introduced .mono { font-family: var(--mono); font-size: 13px; }
+
+/* Activity */
+:root { --bad: var(--danger); }
+.activity { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 20px 24px; margin-bottom: 28px; }
+.pulse-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 16px; }
+.pulse { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; font-size: 16px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); position: relative; flex: none; }
+.dot.live { background: var(--good); }
+.dot.live::after { content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 2px solid var(--good);
+  opacity: 0; animation: ping 2s ease-out infinite; }
+@keyframes ping { 0% { transform: scale(0.5); opacity: 0.8; } 100% { transform: scale(1.4); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .dot.live::after { animation: none; } }
+.dot.warn { background: var(--warn); }
+.dot.good { background: var(--good); }
+.dot.bad { background: var(--bad); }
+.claude-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0 0 16px; font-size: 14px; }
+.claude-row .run-now { margin-left: auto; }
+.pulse-row .sub { font-size: 14px; }
+#scan-stop { margin-left: 0; }  /* next to Go, which takes the free space before them */
+#scan-state { margin: -8px 0 16px; }
+.run-now { margin-left: auto; min-height: 44px; padding: 0 16px; border: 1px solid var(--line-strong); border-radius: 6px;
+  background: none; color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; }
+.run-now:disabled { cursor: default; opacity: 0.55; }
+.sweep { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: -8px 0 12px; }
+.sweep[hidden], .sweep button[hidden] { display: none; }
+.sweep button { min-height: 32px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 6px;
+  background: var(--surface); font-size: 14px; cursor: pointer; }
+.sweep button:disabled { cursor: default; opacity: 0.55; }
+.sources:empty { display: none; }
+.sources { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.source { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; min-width: 0; }
+.source .name { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; font-size: 14px; }
+.state { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; }
+.state svg { flex: none; }
+.state.ok { color: var(--good); } .state.warn { color: var(--warn); } .state.bad { color: var(--bad); }
+.source .line { font-size: 13px; color: var(--muted); margin-top: 4px; overflow-wrap: anywhere; }
+.source .err { font-family: var(--mono); font-size: 12px; color: var(--bad); margin-top: 6px; overflow-wrap: anywhere; }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px 32px; }
+.chart h3 { margin: 0 0 2px; text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--ink); }
+.chart .note { font-size: 13px; color: var(--muted); margin: 0 0 8px; min-height: 1.5em; }
+.plot { position: relative; height: 96px; display: flex; align-items: flex-end; gap: 2px; border-bottom: 1px solid var(--line-strong); }
+.plot .ymax { position: absolute; top: -2px; left: 0; font: 11px var(--mono); color: var(--muted); }
+.plot .gridline { position: absolute; left: 0; right: 0; top: 0; border-top: 1px dashed var(--line); }
+.bucket { flex: 1 1 0; height: 100%; display: flex; align-items: flex-end; cursor: default; border-radius: 2px; outline-offset: 1px; }
+.bucket span { display: block; width: 100%; background: var(--accent); border-radius: 4px 4px 0 0; min-height: 0; }
+.bucket.zero span { background: var(--line-strong); height: 2px !important; border-radius: 1px; }
+.bucket.none span { background: none; }
+.bucket:hover span, .bucket:focus span { filter: brightness(1.25); }
+.bucket:hover, .bucket:focus { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.xaxis { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 4px; }
+.chart details { margin-top: 6px; font-size: 13px; }
+.chart summary { cursor: pointer; color: var(--muted); }
+.chart table { border-collapse: collapse; margin-top: 6px; font-family: var(--mono); font-size: 12px; }
+.chart td, .chart th { padding: 2px 12px 2px 0; text-align: right; }
+.chart th { text-align: left; font-family: var(--sans); color: var(--muted); font-weight: 500; }
+
+/* Setup: what stops Senti from watching */
+.setup { border-color: var(--bad); }
+.setup h2 { margin: 0 0 4px; font-size: 16px; }
+.setup .intro { margin: 0 0 16px; font-size: 14px; color: var(--muted); }
+.problems { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.problem { border: 1px solid var(--line); border-left: 4px solid var(--bad); border-radius: 8px; padding: 12px 16px; min-width: 0; }
+.problem.warn { border-left-color: var(--warn); }
+.problem .what { font-weight: 600; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.problem .what .num { font-family: var(--mono); color: var(--muted); font-weight: 500; }
+.problem .do { margin: 6px 0 0; font-size: 14px; overflow-wrap: anywhere; }
+.problem .affects { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+.problem details { margin-top: 6px; font-size: 13px; }
+.problem summary { cursor: pointer; color: var(--muted); }
+.problem pre { margin: 6px 0 0; padding: 8px 10px; background: var(--bg); border-radius: 6px; font: 12px/1.45 var(--mono);
+  white-space: pre-wrap; overflow-wrap: anywhere; }
+.fleet .age { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 6px; }
+.fleet .flag { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--bad); margin-left: 6px;
+  vertical-align: middle; }
+.fleet .flag.good { background: var(--good); }
+.fleet .flag.warn { background: var(--warn); }
+
+/* Analysis */
+.analysis-cols { display: flex; flex-wrap: wrap; gap: 20px 32px; }
+.analysis-cols > div { flex: 1 1 320px; min-width: 0; }
+.analysis h3 { text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--ink); margin: 0 0 8px; }
+.steps { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow-y: auto; border: 1px solid var(--line);
+  border-radius: 8px; font-size: 13px; }
+.steps li { display: flex; gap: 10px; padding: 6px 12px; border-top: 1px solid var(--line); min-width: 0; }
+.steps li:first-child { border-top: 0; }
+.steps time { flex: none; font-family: var(--mono); font-size: 12px; color: var(--muted); padding-top: 1px; }
+.steps .tool { font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
+.steps .note { white-space: pre-line; overflow-wrap: anywhere; }
+.steps .thinking { color: var(--muted); font-style: italic; }
+.steps .more { color: var(--muted); justify-content: center; }
+.steps .result { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.steps .sentinel { font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; }
+.steps.fixlog { max-height: 480px; margin-bottom: 16px; }
+.staged { margin: 0 0 16px; }
+#d-fixing { white-space: pre-line; }
+#d-fix-now { font-weight: 600; margin: 0 0 6px; }
+.fix-queue { margin: 0 0 16px; font-size: 14px; }
+.fix-queue[hidden] { display: none; }
+.fix-queue p { margin: 0 0 4px; }
+.fix-queue ol { margin: 0 0 4px; padding-left: 24px; }
+.fix-queue li { overflow-wrap: anywhere; }
+.fix-queue .queue-tests { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.build { margin: 0 0 16px; padding: 10px 14px; border: 1px solid var(--line); border-left-width: 4px; border-radius: 6px;
+  overflow-wrap: anywhere; }
+.build[hidden] { display: none; }
+.build .fix-build { margin-left: 8px; }
+.build.ok { border-left-color: var(--good); }
+.build.ok b { color: var(--good); }
+.build.failing { border-color: var(--bad); }
+.build.failing b { color: var(--bad); }
+.build.running b, .build.unknown b { color: var(--warn); }
+.build.running, .build.unknown { border-left-color: var(--warn); }
+.staged[hidden] { display: none; }
+.staged .commands { margin: 8px 0 12px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 6px;
+  background: var(--bg); font-family: var(--mono); font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.thinking-now::after { content: "…"; display: inline-block; width: 1.2em; animation: dots 1.4s steps(4, end) infinite;
+  overflow: hidden; vertical-align: bottom; }
+@keyframes dots { 0% { width: 0; } 100% { width: 1.2em; } }
+@media (prefers-reduced-motion: reduce) { .thinking-now::after { animation: none; } }
+.waiting { list-style: none; margin: 0 0 20px; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.waiting li { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; min-width: 0; }
+.waiting .tpl { font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; display: block; margin-top: 2px; }
+.waiting .n { color: var(--muted); }
+.waiting .units { white-space: pre-wrap; }
+.runs { list-style: none; margin: 0; padding: 0; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+.runs li { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.runs .why { color: var(--muted); overflow-wrap: anywhere; }
+.result { white-space: pre-line; font-size: 14px; border-left: 3px solid var(--accent); padding: 4px 0 4px 12px; margin: 0 0 16px; }
+</style>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg width='24' height='28' role='img' aria-label='Senti' viewBox='0 0 96 110' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2349B5D2'%3E%3Cg transform='rotate(25 48 21)'%3E%3Crect x='46' y='9' width='4' height='12'/%3E%3Ccircle cx='48' cy='7' r='6'/%3E%3C/g%3E%3Cpath fill-rule='evenodd' d='M48 19.5a44.5 44.5 0 1 0 0.01 0Zm0 5a39.5 39.5 0 1 1 -0.01 0Z'/%3E%3Cpath fill-rule='evenodd' d='M27 62a21 21 0 1 0 42 0a21 21 0 1 0 -42 0ZM43.5 58a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0Z'/%3E%3Ccircle cx='49.5' cy='54.5' r='3'/%3E%3C/g%3E%3C/svg%3E">
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand">
+      <svg width="24" height="28" role="img" aria-label="Senti" viewBox="0 0 96 110" xmlns="http://www.w3.org/2000/svg"><g fill="#49B5D2"><g transform="rotate(25 48 21)"><rect x="46" y="9" width="4" height="12"/><circle cx="48" cy="7" r="6"/></g><path fill-rule="evenodd" d="M48 19.5a44.5 44.5 0 1 0 0.01 0Zm0 5a39.5 39.5 0 1 1 -0.01 0Z"/><path fill-rule="evenodd" d="M27 62a21 21 0 1 0 42 0a21 21 0 1 0 -42 0ZM43.5 58a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0Z"/><circle cx="49.5" cy="54.5" r="3"/></g></svg>
+      <strong>Senti</strong>
+    </div>
+    <a class="help-link" href="/fixed">Fixed</a>
+    <a class="help-link" href="/setup">Setup</a>
+    <a class="help-link" href="/help">Help</a>
+    <button type="button" id="theme"></button>
+  </div>
+  <div class="fleet" id="fleet" role="navigation" aria-label="Services and environments" hidden></div>
+  <div class="host">
+    <div>
+      <div class="where">
+        <div id="watching">Loading…</div>
+        <p class="connection" id="connection" role="status" hidden></p>
+      </div>
+    </div>
+    <div class="chips" id="chips"></div>
+  </div>
+</header>
+<main>
+  <p class="build" id="build" hidden></p>
+  <p class="build failing" id="scan-banner" role="alert" hidden></p>
+  <section class="activity setup" id="setup" aria-labelledby="setup-title" hidden>
+    <h2 id="setup-title"></h2>
+    <p class="intro" id="setup-intro"></p>
+    <ol class="problems" id="setup-problems"></ol>
+  </section>
+  <div id="suggestions">
+  <div class="title">
+    <h1>Suggested improvements</h1>
+    <p id="rules"></p>
+  </div>
+  <p class="sub" id="learned" data-testid="learned" hidden></p>
+  <div class="fix-queue" id="fix-queue" hidden></div>
+  <nav aria-label="Filter suggestions" id="tabs"></nav>
+  <p class="sub" id="bug-classes" hidden></p>
+  <div class="sweep" id="sweep" hidden>
+    <button type="button" id="sweep-btn" data-testid="sweep-btn"
+      title="Claude rescans, one at a time, each security finding in To review; those it finds fixed move to Done.">Rescan the security findings</button>
+    <span class="sub" id="sweep-state"></span>
+  </div>
+  <div class="sweep" id="fix-rated" hidden>
+    <button type="button" id="fix-rated-btn" data-testid="fix-rated-btn">Fix all</button>
+    <button type="button" id="fix-rated-fast-btn" data-testid="fix-rated-fast-btn">Fix all without tests</button>
+    <span class="sub" id="fix-rated-none" data-testid="fix-rated-none" hidden></span>
+    <span class="sub" id="fix-rated-state"></span>
+  </div>
+  <div class="cols">
+    <section class="list" aria-label="Suggestions" id="list"></section>
+    <article id="detail" hidden>
+      <div class="head"><span class="cat" id="d-cat"></span><span class="key" id="d-key"></span><span id="d-state"></span><span id="d-when"></span><span id="d-class"></span><span class="num" id="d-num"></span></div>
+      <div class="titlebar">
+        <h2 id="d-title"></h2>
+        <button type="button" id="copy-btn" class="icon" aria-label="Copy for the agent">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>
+          </svg>
+        </button>
+      </div>
+      <p class="summary" id="d-summary" hidden></p>
+      <div class="d-cols">
+      <div class="d-main">
+      <div class="scores">
+        <div class="p"><small>Priority</small><b id="d-priority"></b></div>
+        <div><small>Impact</small><b id="d-impact"></b></div>
+        <div><small>Confidence</small><b id="d-confidence"></b></div>
+        <div><small>Effort</small><b id="d-effort"></b></div>
+        <div><small>Trend</small><b id="d-trend"></b></div>
+      </div>
+      <h3>Evidence</h3><p id="d-evidence"></p>
+      <h3>Why it happens</h3><p id="d-hypothesis"></p>
+      <h3>Where in OBP-API</h3><ul class="files" id="d-files"></ul>
+      <h3>Suggested change</h3><p id="d-fix"></p>
+      <h3>History</h3>
+      <div class="history">
+        <div class="introduced" id="d-introduced" hidden></div>
+        <div id="d-history"></div>
+        <button type="button" id="trace-btn" title="Which commit introduced the problem">Trace history</button>
+      </div>
+      </div>
+      <aside class="d-side" aria-label="Status and actions">
+      <div class="grades" role="group" aria-label="How much this matters to you">
+        <button type="button" data-verdict="relevant" data-testid="grade-relevant" title="Worth fixing">Relevant</button>
+        <button type="button" data-verdict="important" data-testid="grade-important" title="Worth fixing soon; counts twice in what Senti learns">Important</button>
+        <button type="button" data-verdict="urgent" data-testid="grade-urgent" title="Fix first: also puts it at the head of the Fix this queue">Urgent</button>
+        <button type="button" data-verdict="later" data-testid="grade-later" title="Brings it back later">Skip for now</button>
+        <button type="button" data-verdict="dismissed" data-testid="grade-dismissed" title="Hides it and its log messages for good">Dismiss</button>
+      </div>
+      <div class="respond">
+        <p class="previous" id="d-previous" hidden></p>
+        <div class="exchange" id="d-exchange" hidden data-testid="reply">
+          <p><b>You: </b><span id="d-reply-to"></span></p>
+          <p><b id="d-reply-who">Senti: </b><span id="d-reply"></span></p>
+          <p class="previous" id="d-comments-count" hidden></p>
+        </div>
+        <label for="comment">Comment or question for Senti <span>(Senti answers it, and does what you ask: rate, skip, dismiss, mark fixed, rescan or fix again)</span></label>
+        <textarea id="comment" rows="2" maxlength="2000"></textarea>
+        <div class="actions">
+          <div class="act"><button type="button" data-verdict="comment" title="Keeps your comment with the finding">Save comment</button></div>
+          <div class="act" id="fix-off-row" hidden><span class="desc full" id="fix-off"></span></div>
+          <div class="act" id="fix-row"><button type="button" class="primary" id="fix-btn" title="Claude fixes and tests it; Senti stages it in your working tree">Fix this</button></div>
+          <div class="act" id="fix-fast-row"><button type="button" id="fix-fast-btn" title="The same without running tests; CI runs them once you push">Fix this without tests</button></div>
+          <!-- What the latest fix came to: moved under Fix this or Fix this without tests, whichever made it -->
+          <div class="outcome" id="fix-outcome" hidden>
+            <p class="now" id="d-fix-now" data-testid="fix-now" hidden></p>
+            <p class="previous" id="d-fixing" hidden></p>
+            <div class="staged" id="d-staged" hidden>
+              <h3>The fix's files</h3>
+              <ul class="files" id="d-staged-files"></ul>
+              <p class="desc">Review it in your IDE, then Stage and Commit. Senti commits only when you press Commit.</p>
+              <label for="d-commit-msg">Commit message <span>(edit it before you press Commit)</span></label>
+              <textarea id="d-commit-msg" data-testid="commit-message" rows="2" maxlength="500" spellcheck="true"></textarea>
+              <pre class="commands" id="d-commands" data-testid="fix-commands"></pre>
+              <div class="actions">
+                <div class="act"><button type="button" class="fix-action" data-action="stage" data-testid="stage-btn" title="git add this fix's files, with your changes">Stage</button></div>
+                <div class="act"><button type="button" class="fix-action" data-action="unstage" data-testid="unstage-btn" title="Take them out of what is staged; the changes stay">Unstage</button></div>
+                <div class="act"><button type="button" class="fix-action" data-action="commit" data-testid="commit-btn" title="Commit what is staged, with the message above">Commit</button></div>
+                <div class="act"><button type="button" id="copy-commands-btn" title="To run them in a terminal">Copy the commands</button></div>
+                <div class="act"><button type="button" class="fix-action" data-action="discard" id="discard-btn" title="Take this fix back out of your working tree">Discard</button></div>
+              </div>
+            </div>
+            <details id="fix-log-box" hidden>
+              <summary id="fix-log-title">What Claude did</summary>
+              <ol class="steps fixlog" id="d-fix-log" aria-live="polite"></ol>
+            </details>
+          </div>
+          <div class="act"><button type="button" data-verdict="fixed" title="You think it is fixed: moves to Done">Should be fixed now</button></div>
+          <div class="outcome" id="fixed-outcome" hidden><p class="previous" id="d-marked-fixed"></p></div>
+          <div class="act"><button type="button" id="recheck-btn" title="Claude reads the code the instance runs now and answers in one line; if it finds the finding fixed, it moves to Done">Rescan</button></div>
+          <div class="outcome" id="recheck-outcome" hidden><p class="previous" id="d-recheck"></p></div>
+        </div>
+        <p class="desc"><a href="/help#buttons">What these buttons do</a></p>
+        <p class="status" role="status" id="status"></p>
+      </div>
+      </aside>
+      </div>
+    </article>
+  </div>
+  </div>
+  <section class="activity" aria-labelledby="activity-title">
+    <h2 id="activity-title" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Monitoring activity</h2>
+    <div class="pulse-row">
+      <span class="pulse"><span class="dot" id="a-dot"></span><span id="a-state">Loading…</span></span>
+      <span class="sub" id="a-when"></span>
+    </div>
+    <div id="a-ok"></div>
+    <div class="sources" id="a-sources"></div>
+    <details class="problem" id="a-new">
+      <summary id="a-new-title"></summary>
+      <p class="affects">A kind of log message is one message with its ids, numbers and values taken out, so the
+        same problem counts once. These were seen for the first time in the last 24 hours.</p>
+      <ul class="waiting" id="a-new-list"></ul>
+    </details>
+    <div class="charts">
+      <div class="chart" id="chart-logs"></div>
+      <div class="chart" id="chart-calls"></div>
+    </div>
+  </section>
+  <section class="activity analysis" aria-labelledby="analysis-title">
+    <div class="pulse-row">
+      <span class="pulse"><span class="dot" id="n-dot"></span><span id="analysis-title">Analyst</span></span>
+      <span class="sub" id="n-when"></span>
+      <button type="button" class="run-now" id="run-now">Run analysis now</button>
+    </div>
+    <details class="more" id="n-more">
+    <summary>Details</summary>
+    <div class="claude-row">
+      <span class="dot" id="claude-dot"></span>
+      <span id="claude-state" aria-live="polite">Claude Code: not checked yet</span>
+      <button type="button" class="run-now" id="claude-check" title="Ask Claude Code one tiny question">Check Claude Code</button>
+    </div>
+    <div class="analysis-cols">
+      <div>
+        <h3 id="n-steps-title">What it did</h3>
+        <p class="result" id="n-result" hidden></p>
+        <ol class="steps" id="n-steps" aria-live="polite"></ol>
+      </div>
+      <div>
+        <h3>Waiting for the analyst</h3>
+        <ul class="waiting" id="n-waiting"></ul>
+        <h3>Recent runs</h3>
+        <ul class="runs" id="n-runs"></ul>
+      </div>
+    </div>
+    </details>
+  </section>
+  <section class="activity analysis" aria-labelledby="source-title">
+    <div class="pulse-row">
+      <span class="pulse"><span class="dot" id="scan-dot"></span><span id="source-title">Source review</span></span>
+      <span class="sub" id="source-when"></span>
+      <button type="button" class="run-now" id="scan-go" title="Claude reviews the code of the next few endpoints, most reachable first, scan after scan, and records what it finds as findings.">Go</button>
+      <button type="button" class="run-now" id="scan-stop" title="Ends the scan that is running, and no more scans.">Stop</button>
+    </div>
+    <p class="sub" id="scan-state"></p>
+    <details class="more" id="scan-more">
+    <summary>Details</summary>
+    <div class="analysis-cols">
+      <div>
+        <h3>Reviewed, most reachable first</h3>
+        <ul class="waiting" id="source-tiers"></ul>
+      </div>
+      <div>
+        <h3>Latest reviewed</h3>
+        <ul class="waiting" id="source-recent"></ul>
+        <h3>Recent scans</h3>
+        <ul class="waiting" id="scan-runs"></ul>
+      </div>
+    </div>
+    <h3>What is scanned, per instance</h3>
+    <ul class="waiting" id="source-instances"></ul>
+    </details>
+  </section>
+  <section class="activity analysis" aria-labelledby="sonar-title" id="sonar-box" hidden>
+    <div class="pulse-row">
+      <span class="pulse"><span id="sonar-title">SonarCloud settings</span></span>
+      <span class="sub" id="sonar-when"></span>
+    </div>
+    <details class="more" id="sonar-more">
+    <summary>Suggested settings file</summary>
+    <ul class="waiting" id="sonar-notes"></ul>
+    <h3>What the suggestion changes</h3>
+    <ul class="waiting" id="sonar-effects"></ul>
+    <h3 id="sonar-file-title"></h3>
+    <pre class="commands" id="sonar-suggested" data-testid="sonar-suggested"></pre>
+    <div class="act"><button type="button" id="sonar-copy">Copy</button></div>
+    <details id="sonar-current-box"><summary id="sonar-current-title">The files as they are now</summary>
+      <pre class="commands" id="sonar-current"></pre></details>
+    </details>
+  </section>
+</main>
+<script>
+// Everything shown comes from sentinel.db, partly derived from OBP-API logs: set as text, never as HTML.
+// In the order a finding moves through them, as on a kanban board
+const TABS = [
+  ['open', 'Not suggested yet', ['open']],
+  ['review', 'To review', ['suggested']],
+  ['later', 'Snoozed', ['later']],
+  ['queued', 'Queued', []],  // Fix this, whatever the status (FIX_TABS): waiting its turn,
+  ['fixing', 'Being fixed', []],  // then Claude at work,
+  ['commit', 'To commit', []],  // then staged in the working tree, for a person to commit or Discard
+  ['done', 'Done', ['accepted', 'acted', 'fixed', 'dismissed']],
+];
+// Your ratings, whatever stage the finding is at: each a tab after the stages
+const RATED_TABS = [['urgent', 'Urgent'], ['important', 'Important'], ['relevant', 'Relevant'],
+                    ['later', 'Skipped'], ['dismissed', 'Dismissed']].map(([rating, label]) => [`rated-${rating}`, label, rating]);
+const RATED_LABEL = { urgent: 'Urgent', important: 'Important', relevant: 'Relevant', later: 'Skipped for now', dismissed: 'Dismissed' };
+const inTab = (f, tab) => tab.startsWith('rated-')
+  ? `rated-${f.rating}` === tab && (f.rating === 'dismissed' || tabOf(f) !== 'done')  // done: in Done, not under its rating
+  : tabOf(f) === tab;
+const FIX_TABS = { queued: 'queued', running: 'fixing', staged: 'commit' };
+const tabOf = (f) => FIX_TABS[f.fix_status] || (TABS.find((t) => t[2].includes(f.status)) || TABS[0])[0];
+// A suggested finding says when Senti first suggested it (put it in a digest), e.g. Suggested to you on 15 Nov
+const statusLabel = (f) => f.status === 'suggested' && f.first_suggested
+  ? `Suggested to you on ${new Date(f.first_suggested * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+  : STATUS[f.status] || f.status;
+const TREND = { new: 'New', rising: 'Rising', stable: 'Stable', falling: 'Falling' };
+const STATUS = { suggested: 'Suggested to you', open: 'Not suggested yet', later: 'Snoozed', accepted: 'Accepted', acted: 'Some action taken',
+                 fixed: 'Fixed', dismissed: 'Dismissed' };
+const FIX_STATUS = { queued: 'Queued for fixing', running: 'Being fixed', staged: 'Fix staged', committed: 'Fix committed',
+                     skipped: 'Not fixed: no change needed', failed: 'Fix failed', discarded: 'Fix discarded' };
+const CAT_COLOR = { bug: 'var(--danger)', reliability: 'var(--danger)', security: 'var(--danger)' };
+const state = { instance: null, instances: [], tab: 'review', selected: null, findings: [], overview: null, learned: null };
+
+const $ = (id) => document.getElementById(id);
+const el = (tag, props = {}, children = []) => {
+  const node = Object.assign(document.createElement(tag), props);
+  for (const c of children) node.append(c);
+  return node;
+};
+const fmtDate = (ts) => ts ? new Date(ts * 1000).toLocaleString([], { hourCycle: 'h23' }) : '—';
+const fmtNum = (n) => n == null ? '—' : Number(n).toLocaleString();
+
+// Every call is about the instance whose tab is open
+async function api(path, options) {
+  const url = state.instance ? `${path}${path.includes('?') ? '&' : '?'}instance=${encodeURIComponent(state.instance)}` : path;
+  const instance = state.instance;
+  const response = await fetch(url, options);
+  const body = await response.json();
+  if (instance !== state.instance) return new Promise(() => {});  // another tab opened meanwhile: drop this reply
+  if (!response.ok) throw new Error(body.error || response.statusText);
+  return body;
+}
+
+// How old the commit an instance runs is, from the OBP-API checkout
+function commitAge(c, long = false) {
+  if (!c || !c.commit_ts) return '';
+  const days = Math.floor((Date.now() / 1000 - c.commit_ts) / 86400);
+  if (!long) return days < 1 ? 'today' : `${days}d old`;
+  const date = new Date(c.commit_ts * 1000).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+  return `${days < 1 ? 'today' : days === 1 ? '1 day old' : `${days} days old`}, ${date}`;
+}
+
+function renderHeader() {
+  const o = state.overview;
+  const c = o.commit;
+  const why = !c ? '' : c.commit_ts ? ` (${commitAge(c, true)})`
+    : ' (age unknown: not in the checkout nor on GitHub)';
+  const open = state.instances.find((i) => i.name === state.instance);
+  $('watching').replaceChildren(el('b', { textContent: open ? `Watching ${open.service} in ${open.environment}` : 'Watching' }),
+    ` at ${o.obp_base_url}`,
+    c ? ` · commit ${c.git_commit.slice(0, 12)}${why}` : '');
+  // No figures here: the sections below show them. Only a warning, when an endpoint answers without a token.
+  $('chips').replaceChildren(...securedChip(o.secured));
+  renderBuild(o.build);
+  $('rules').textContent = `At most ${o.digest_size} per digest, ${o.max_per_week} a week.`;
+}
+
+// The OBP-API build on GitHub Actions (OBP_API_BUILD_ACTIONS_URL): green when it passed, red with the cause if not
+function renderBuild(b) {
+  $('build').hidden = !b;
+  if (!b) return;
+  $('build').className = `build ${b.state}`;
+  const [mark, label] = { ok: ['✓', 'OK'], failing: ['✗', 'Build failing'], running: ['…', 'Build running'],
+                          unknown: ['?', 'Build unknown'] }[b.state] || ['?', b.state];
+  $('build').replaceChildren(el('b', { textContent: `${mark} ${label}` }), ' ',
+    b.state === 'ok' ? b.text.replace(/^Build OK: /, '') : b.text, ' · ', el('a', { href: b.url, textContent: 'GitHub Actions' }),
+    ...(b.state === 'failing' && !state.overview.fix_unavailable ? [' ', fixBuildButton()] : []));
+}
+
+// Whether the endpoints Senti reads (log cache, Telemetry, aggregate metrics, or an app's /monitoring) refuse a
+// call with no token, as checked hourly by the collector (every poll while it cannot tell)
+function securedChip(s) {
+  if (!s || s.verdict === 'secured') return [];  // shown only when an endpoint answers without a token, or Senti cannot tell
+  const odd = s.checks.filter((c) => !(s.verdict === 'open' ? c.status !== 200 : [401, 403].includes(c.status)));
+  const [mark, text] = { secured: ['✓', 'Secured: no token, no data'], open: ['✗', 'Open: answers without a token'],
+                         unknown: ['?', 'Secured? Could not tell'] }[s.verdict];
+  return [el('div', { className: `chip guard ${s.verdict}` }, [
+    el('b', { className: 'mark', textContent: mark + ' ' }), text,
+    ...(odd.length ? [el('span', { textContent: ': ' + odd.map((c) => `${c.path} (${c.status ?? 'no answer'})`).join(', ') })] : []),
+  ])];
+}
+
+// Text with each "#123" that names a known finding turned into a link that opens it
+function withFindingLinks(text) {
+  return String(text ?? '').split(/(#\d+)/).map((part) => {
+    const f = /^#\d+$/.test(part) && state.findings.find((x) => x.id === Number(part.slice(1)));
+    if (!f) return part;
+    const a = el('a', { href: location.hash || '#', textContent: part });
+    a.onclick = (e) => {
+      e.preventDefault();
+      Object.assign(state, { tab: tabOf(f), selected: f.id });
+      setStatus('');
+      render();
+      $('detail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    return a;
+  });
+}
+
+// The order Fix this works through its queue: paused at the usage limit or Urgent first, then by rating, then priority
+const RATING_RANK = { urgent: 3, important: 2, relevant: 1 };
+const fixOrder = (a, b) => (b.fix_at === 0) - (a.fix_at === 0) || (RATING_RANK[b.rating] || 0) - (RATING_RANK[a.rating] || 0)
+  || b.priority - a.priority;
+
+const RATING_NAME = { urgent: 'Urgent', important: 'Important', relevant: 'Relevant' };
+const toFix = (rating) => state.findings.filter((f) => f.to_fix && f.rating === rating).length;
+
+// On the Urgent, Important or Relevant tab: the rating it shows, else null
+const tabRating = () => (state.tab.match(/^rated-(urgent|important|relevant)$/) || [])[1] || null;
+
+function renderFixRated() {
+  const off = !state.overview || state.overview.fix_unavailable;
+  const rating = tabRating();
+  const n = rating ? toFix(rating) : 0;
+  // Always shown on the Urgent, Important and Relevant tabs: with nothing to queue, it says why
+  $('fix-rated').hidden = !rating;
+  $('fix-rated-btn').hidden = $('fix-rated-fast-btn').hidden = Boolean(off) || !n;
+  const none = !rating ? '' : off ? `No Fix all here: ${off}.`
+    : !n ? `0 ${RATING_NAME[rating]} findings to fix: Fix all only queues findings that Fix this has not been tried on yet.` : '';
+  // Once you have queued them, the message saying so is enough
+  $('fix-rated-none').hidden = !none || Boolean($('fix-rated-state').textContent);
+  $('fix-rated-none').textContent = none;
+  if (off || !n) return;
+  $('fix-rated-btn').textContent = `Fix all ${n} ${RATING_NAME[rating]}`;
+  $('fix-rated-btn').title = `Queues Fix this, with tests, for each finding rated ${RATING_NAME[rating]} that Fix this has not been tried on.`;
+  $('fix-rated-fast-btn').textContent = `Fix all ${n} ${RATING_NAME[rating]} without tests`;
+  $('fix-rated-fast-btn').title = 'The same without running tests; CI runs them once you push.';
+}
+
+async function fixAllRated(tests) {
+  const rating = tabRating();
+  const n = toFix(rating);
+  const how = tests ? 'with tests' : 'without tests';
+  if (!confirm(`Queue Fix this, ${how}, for ${n} finding${n === 1 ? '' : 's'} rated ${RATING_NAME[rating]}?`)) return;
+  const buttons = [$('fix-rated-btn'), $('fix-rated-fast-btn')];
+  buttons.forEach((b) => { b.disabled = true; });
+  try {
+    const done = await api('/api/fix-queue/fix-all-rated', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rating, tests }) });
+    state.findings = await api('/api/findings');
+    render();
+    $('fix-rated-state').textContent = `${done.queued} ${RATING_NAME[rating]} queued ${how}; see the Queued tab.`;
+    const next = state.findings.find((x) => x.fix_status === 'queued');
+    if (next) pollWhileRunning(next.id, 'fix_status');
+  } catch (e) {
+    $('fix-rated-state').textContent = `Could not queue: ${e.message}`;
+  } finally {
+    buttons.forEach((b) => { b.disabled = false; });
+  }
+}
+
+$('fix-rated-btn').addEventListener('click', () => fixAllRated(true));
+$('fix-rated-fast-btn').addEventListener('click', () => fixAllRated(false));
+
+function visible() {
+  const shown = state.findings.filter((f) => inTab(f, state.tab));
+  // Most important first, the kinds you act on before the kinds you dismiss; Queued as Fix this works through it:
+  // a fix paused at the usage limit first
+  if (state.tab === 'queued') return shown.sort(fixOrder);
+  return shown.sort((a, b) => (b.rank ?? b.priority) - (a.rank ?? a.priority));
+}
+
+// Suggestions go above the monitoring sections while something waits for review.
+function render() {
+  const count = (id) => state.findings.filter((f) => inTab(f, id)).length;
+  const tab = ([id, label]) => {
+    const b = el('button', { type: 'button' }, [label, el('span', { className: 'n', textContent: count(id) })]);
+    b.setAttribute('aria-pressed', String(state.tab === id));
+    b.onclick = () => { state.tab = id; state.selected = null; setStatus(''); $('fix-rated-state').textContent = ''; render(); };
+    return b;
+  };
+  // Empty tabs are left out, except To review and the one open
+  const shown = (tabs) => tabs.filter(([id]) => id === 'review' || id === state.tab || count(id));
+  const rated = shown(RATED_TABS);
+  $('tabs').replaceChildren(...shown(TABS).map(tab),
+    ...(rated.length ? [el('span', { className: 'rated-label', textContent: 'Your ratings:' }), ...rated.map(tab)] : []));
+
+  renderSweep();
+  renderFixRated();
+  // On Done: how many of the fixed bugs were of each class, to see which kinds OBP-API had most
+  const bc = (state.overview && state.overview.bug_classes) || [];
+  $('bug-classes').hidden = state.tab !== 'done' || !bc.length;
+  $('bug-classes').textContent = 'Bug classes: ' + bc.map(([name, n]) => `${name} ${n}`).join(' · ');
+  renderFixQueue();
+  const items = visible();
+  const current = items.find((f) => f.id === state.selected) || items[0];
+  state.selected = current ? current.id : null;
+
+  // A path in a title may wrap after any /, rather than overflowing the card
+  const breakAfterSlashes = (text) => text.split('/').flatMap((part, i) => i ? ['/', el('wbr'), part] : [part]);
+
+  $('list').replaceChildren(...(items.length ? items.map((f) => {
+    // A div, not a button: its text must stay selectable and copyable
+    const b = el('div', { className: 'item', tabIndex: 0 }, [
+      el('div', { className: 'top' }, [
+        el('span', { className: 'cat', textContent: f.category }),
+        el('span', { className: 'prio', textContent: `P ${f.priority.toFixed(2)}` }),
+        el('span', { className: 'num', textContent: `#${f.id}` }),
+      ]),
+      el('div', { className: 't' }, breakAfterSlashes(f.title)),
+      el('div', { className: 'meta' }, [TREND[f.trend] || f.trend, '·', statusLabel(f),
+                                         ...(f.rating && !state.tab.startsWith('rated-') ? ['·', RATED_LABEL[f.rating]] : []),
+                                         ...(f.needs_id ? ['·', 'Needs a guessed id'] : []),
+                                         ...(f.fix_tests === 0 && f.fix_status ? ['·', 'Tests not run'] : []),
+                                         ...(f.fix_status ? ['·', FIX_STATUS[f.fix_status] || f.fix_status] : [])]
+        .map((s) => el('span', { textContent: s }))),
+    ]);
+    b.querySelector('.cat').style.color = CAT_COLOR[f.category] || 'var(--muted)';
+    b.setAttribute('aria-current', String(f.id === state.selected));
+    if (f.id === state.selected) requestAnimationFrame(() => {
+      const list = $('list');
+      if (b.offsetTop < list.scrollTop || b.offsetTop + b.offsetHeight > list.scrollTop + list.clientHeight)
+        list.scrollTop = b.offsetTop - 4;
+    });
+    const pick = () => { state.selected = f.id; setStatus(''); render(); };
+    b.onclick = () => { if (!String(getSelection())) pick(); };  // not when the click ended a text selection
+    b.onkeydown = (e) => { if (e.key === 'Enter') pick(); };
+    return b;
+  }) : [el('div', { className: 'empty', textContent: 'Nothing here. Senti only suggests what it is sure about.' })]));
+
+  $('detail').hidden = !current;
+  showCommentDraft(current && current.id);
+  if (!current) return;
+  $('d-cat').textContent = current.category;
+  $('d-cat').style.color = CAT_COLOR[current.category] || 'var(--muted)';
+  $('d-key').textContent = current.key;
+  $('d-num').textContent = `#${current.id}`;
+  $('d-when').textContent = current.first_suggested ? `First suggested ${fmtDate(current.first_suggested)}`
+                                                    : `Found ${fmtDate(current.created_at)}`;
+  $('d-class').textContent = current.bug_class ? `Class: ${current.bug_class}` : '';
+  $('d-title').textContent = current.title;
+  $('d-summary').textContent = current.summary || '';
+  $('d-summary').hidden = !current.summary;
+  $('d-priority').textContent = current.priority.toFixed(2);
+  $('d-impact').textContent = `${current.impact}/5`;
+  $('d-confidence').textContent = `${Math.round(current.confidence * 100)}%`;
+  $('d-effort').textContent = `${current.effort}/5`;
+  $('d-trend').textContent = TREND[current.trend] || current.trend;
+  document.querySelectorAll('.grades button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.verdict === current.rating)));
+  // Each commit the evidence names gets "(N days ago)"
+  const commits = current.evidence_commits || {};
+  $('d-evidence').textContent = (current.evidence || '').replace(/\b[0-9a-f]{7,40}\b/g,
+    (sha) => commits[sha] ? `${sha.slice(0, 9)} (${daysAgo(commits[sha].ts)})` : sha);  // a commit: short, and how old
+  renderRecheck(current);
+  renderFix(current);
+  renderHistory(current);
+  $('d-hypothesis').textContent = current.hypothesis;
+  $('d-files').replaceChildren(...current.files.map((f) => el('li', { textContent: f })));
+  $('d-fix').textContent = current.suggested_fix;
+  renderReply(current);
+  const fb = current.feedback;
+  const markedFixed = fb && fb.verdict === 'fixed';
+  $('fixed-outcome').hidden = !markedFixed || (fb.comment || '').startsWith('Fix this:');
+  if (markedFixed) $('d-marked-fixed').textContent = `Marked fixed on ${fmtDate(fb.ts)}` + (fb.comment ? `: “${fb.comment}”` : '');
+  $('d-state').replaceChildren(stateOf(current));
+  $('d-state').className = current.status === 'fixed' ? 'good' : ['queued', 'running', 'staged'].includes(current.fix_status) ? 'busy' : '';
+  $('d-previous').hidden = !fb || markedFixed;
+  if (fb && !markedFixed) {
+    $('d-previous').textContent = fb.verdict === 'comment' ? `Last comment ${fmtDate(fb.ts)}`
+      : `Marked ${fb.verdict} on ${fmtDate(fb.ts)}` + (fb.comment ? `: “${fb.comment}”` : '');
+  }
+}
+
+// Where a fix is now, from git when the page asked: not what Senti wrote at the time
+function fixNow(f) {
+  if (f.fix_status === 'staged') {
+    return { staged: 'staged in your working tree, not committed yet.',
+             partly: 'partly staged in your working tree, not committed yet.',
+             unstaged: 'in your working tree, not staged.' }[f.fix_index] || 'in your working tree, not committed yet.';
+  }
+  if (f.fix_status === 'committed' && f.fix_now) {
+    const n = f.fix_now;
+    const pushed = n.pushed_to.length ? `pushed to ${n.pushed_to.join(', ')}` : 'not pushed yet';
+    const runs = n.running === true ? `; ${state.instance} runs it` : n.running === false ? `; ${state.instance} does not run it yet` : '';
+    return `committed as ${n.sha}, ${pushed}${runs}.`;
+  }
+  if (f.fix_status === 'discarded') return 'not in your working tree. Fix this can try again.';
+  return null;
+}
+
+// Where the finding stands, shown by its key
+function stateOf(f) {
+  const sha = f.fix_status === 'committed' && (f.fix || '').split(' ')[0];
+  if (f.fix_status === 'committed' && f.fix_now) {
+    if (!f.fix_now.pushed_to.length) return `Committed · ${sha}, not pushed`;
+    if (f.fix_now.running === false) return `Pushed · ${sha}, not running yet`;
+  }
+  if (f.status === 'fixed') return sha ? `Fixed · ${sha}` : 'Fixed';
+  if (f.fix_status === 'staged') return f.fix_index === 'unstaged' ? 'Fix ready, not staged' : 'Fix staged';
+  if (f.fix_status === 'running') return 'Being fixed';
+  if (f.fix_status === 'queued') return 'Queued for fixing';
+  return statusLabel(f);
+}
+
+// Rescan: is it still an issue in the code the instance runs now? (Claude, in the background, kept with the finding)
+// Only the latest comment and Senti's answer to it; earlier comments are kept, and Fix this follows them all
+function renderReply(f) {
+  const comments = f.comments || [];
+  const latest = f.reply_to || comments[comments.length - 1];
+  $('d-exchange').hidden = !latest;
+  if (!latest) return;
+  const answering = f.reply_status === 'running';
+  const p = answering && f.reply_progress;
+  $('d-reply-to').textContent = latest;
+  $('d-reply-who').textContent = answering || !f.replied_at ? 'Senti: ' : `Senti, ${fmtDate(f.replied_at)}: `;
+  $('d-reply').textContent = answering
+    ? 'Answering…' + (p && p.steps ? ` ${p.steps} command${p.steps === 1 ? '' : 's'} run so far. Now: ${p.step}` : '')
+    : f.reply_status === 'failed' && !f.reply ? 'Could not answer.'
+    : f.reply || 'No answer yet (comments saved before Senti answered them are not answered).';
+  const earlier = comments.length - 1;
+  $('d-comments-count').hidden = earlier < 1;
+  $('d-comments-count').textContent = `${earlier} earlier comment${earlier === 1 ? '' : 's'}: Fix this follows them all.`;
+}
+
+function renderRecheck(f) {
+  const looking = f.recheck_status === 'running';
+  const p = looking && f.recheck_progress;
+  const answer = looking
+    ? 'Rescanning the code the instance runs now. This takes a few minutes; the answer will show here.'
+      + (p ? ` Started ${ago(Date.now() / 1000 - p.started)}, ${p.steps} command${p.steps === 1 ? '' : 's'} run so far. Now: ${p.step}` : '')
+    : f.recheck_status === 'failed' && !f.recheck ? 'Could not rescan.' : f.recheck || '';
+  $('recheck-outcome').hidden = !answer;
+  $('d-recheck').replaceChildren(
+    el('b', { textContent: looking || !f.rechecked_at ? 'Claude: ' : `Claude, ${fmtDate(f.rechecked_at)}: ` }), answer);
+  $('recheck-btn').disabled = looking;
+}
+
+// Fix this: Claude fixes it in Senti's own OBP-API worktree, one queued finding at a time, and Senti commits it
+function renderFix(f) {
+  const why = state.overview && state.overview.fix_unavailable;
+  const p = f.fix_status === 'running' && f.fix_progress;
+  const text = {
+    queued: f.fix || 'Queued. Claude fixes one finding at a time; this one starts when those before it are done.',
+    running: 'Claude is fixing it in Senti\'s worktree: check it is real, change, compile, run its tests.'
+      + (p ? ` Started ${ago(Date.now() / 1000 - p.started)}, ${p.steps} command${p.steps === 1 ? '' : 's'} run so far. Now: ${p.step}` : ''),
+  }[f.fix_status] || f.fix || '';
+  const staged = f.fix_status === 'staged';
+  $('d-staged').hidden = !staged;
+  if (staged) {
+    $('d-staged-files').replaceChildren(...(f.fix_files || []).map((name) => el('li', { textContent: name })));
+    // Your edit is kept per finding until you commit, also when the page refreshes itself
+    if (document.activeElement !== $('d-commit-msg') || $('d-commit-msg').dataset.for !== String(f.id)) {
+      $('d-commit-msg').value = commitMessage(f);
+      $('d-commit-msg').dataset.for = String(f.id);
+    }
+    $('d-commands').textContent = commitCommands(f);
+    document.querySelector('.fix-action[data-action="stage"]').disabled = f.fix_index === 'staged';
+    document.querySelector('.fix-action[data-action="unstage"]').disabled = f.fix_index === 'unstaged';
+    document.querySelector('.fix-action[data-action="commit"]').disabled = f.fix_index === 'unstaged';
+  }
+  loadFixLog(f);
+  // Under the button that made the fix
+  $(f.fix_tests === 0 ? 'fix-fast-row' : 'fix-row').after($('fix-outcome'));
+  $('fix-outcome').hidden = !text && !staged && !(f.fix_status && f.fix_status !== 'queued');
+  $('d-fixing').hidden = !text;
+  const now = fixNow(f);
+  $('d-fix-now').hidden = !now;
+  $('d-fix-now').textContent = now ? `Now: ${now}` : '';
+  // What Senti did is kept as it was then; Now says where the fix is today
+  const label = ['queued', 'running'].includes(f.fix_status) ? FIX_STATUS[f.fix_status]
+    : `What Senti did${f.fix_at ? `, ${fmtDate(f.fix_at)}` : ''}`;
+  $('d-fixing').replaceChildren(el('b', { textContent: `${label}: ` }), ...withFindingLinks(text));
+  const btn = $('fix-btn');
+  btn.classList.remove('busy', 'done');
+  $('fix-row').hidden = $('fix-fast-row').hidden = Boolean(why);
+  $('fix-off-row').hidden = !why;
+  $('fix-off').textContent = why ? `No Fix this here: ${why}.` : '';
+  btn.disabled = $('fix-fast-btn').disabled = ['queued', 'running', 'staged', 'committed'].includes(f.fix_status);
+  $('fix-fast-btn').classList.remove('busy', 'done');
+  $('fix-fast-btn').textContent = 'Fix this without tests';
+  btn.textContent = ['skipped', 'failed', 'discarded'].includes(f.fix_status) ? 'Try fixing again' : 'Fix this';
+}
+
+// Everything Claude did for the finding's latest fix: notes, tool calls and their results, and Senti's own
+// steps. Fetched again while it is being fixed (each refresh), else once.
+const FIX_LOG_KIND = { thinking: 'Thinking', note: 'Claude', tool: 'Tool', result: 'Tool output', sentinel: 'Senti' };
+async function loadFixLog(f) {
+  const show = Boolean(f.fix_status) && f.fix_status !== 'queued';
+  $('fix-log-box').hidden = !show;
+  if (state.fixLogFor !== f.id) $('fix-log-box').open = f.fix_status === 'running';  // open while Claude works
+  if (!show) { state.fixLogFor = null; return; }
+  if (state.fixLogFor === f.id && f.fix_status !== 'running') return;
+  state.fixLogFor = f.id;
+  const steps = await api(`/api/findings/${f.id}/fix-log`).catch(() => null);
+  if (!steps || state.selected !== f.id) return;
+  const list = $('d-fix-log');
+  const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 24;
+  list.replaceChildren(...(steps.length ? steps.map((s) => el('li', {}, [
+    el('time', { textContent: clock(s.ts) }),
+    el('span', { className: s.kind, textContent: s.kind === 'thinking' ? 'Thinking' : `${FIX_LOG_KIND[s.kind] || s.kind}: ${s.text}` }),
+  ])) : [el('li', { className: 'more', textContent: 'Nothing recorded yet.' })]));
+  if (atBottom || f.fix_status === 'running') list.scrollTop = list.scrollHeight;
+}
+
+// The commands to commit a staged fix by hand: git add its files, then git commit with its one short line. Quoted for a POSIX
+// shell.
+const shq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
+// The commit message: your edit if you made one, else Claude's one line
+const commitDrafts = {};
+// The comment box keeps an unsaved draft for each finding, like the commit message: another finding shows its own
+const commentDrafts = {};
+function showCommentDraft(id) {
+  const box = $('comment');
+  if (box.dataset.for === String(id)) return;
+  box.value = (id != null && commentDrafts[id]) || '';
+  box.dataset.for = id == null ? '' : String(id);
+}
+function clearComment(id) {
+  delete commentDrafts[id];
+  if ($('comment').dataset.for === String(id)) $('comment').value = '';
+}
+$('comment').addEventListener('input', () => {
+  const id = $('comment').dataset.for;
+  if (!id) return;
+  if ($('comment').value.trim()) commentDrafts[id] = $('comment').value;
+  else delete commentDrafts[id];
+});
+const commitMessage = (f) => commitDrafts[f.id] ?? (f.fix_message || f.title);
+
+function commitCommands(f) {
+  const git = `git -C ${shq(state.overview ? state.overview.obp_api_source : '.')}`;
+  return [`${git} add ${(f.fix_files || []).map(shq).join(' ')}`,
+          `${git} commit -m ${shq(commitMessage(f).split(/\s+/).join(' ').trim())}`].join('\n');
+}
+
+$('d-commit-msg').addEventListener('input', () => {
+  const f = state.findings.find((x) => x.id === state.selected);
+  if (!f) return;
+  commitDrafts[f.id] = $('d-commit-msg').value;
+  $('d-commands').textContent = commitCommands(f);
+});
+// Enter commits nothing by itself: one line only
+$('d-commit-msg').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
+
+$('copy-commands-btn').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('d-commands').textContent);
+    setStatus('Copied the commands.');
+  } catch (e) {
+    setStatus(`Could not copy: ${e.message}`, true);
+  }
+});
+
+// Stage, Commit and Discard a staged fix. Only Commit and Discard let the queue go on.
+const FIX_DONE = {
+  stage: (id, r) => `Staged ${r.staged.length} file${r.staged.length === 1 ? '' : 's'} for #${id}.`,
+  unstage: (id, r) => `Unstaged ${r.unstaged.length} file${r.unstaged.length === 1 ? '' : 's'} for #${id}; your changes are still in them.`,
+  commit: (id, r) => `Committed the fix for #${id} as ${r.commit}.`,
+  discard: (id) => `Took the fix for #${id} out of your working tree.`,
+};
+document.querySelectorAll('.fix-action').forEach((button) => button.addEventListener('click', async () => {
+  const id = state.selected;
+  const action = button.dataset.action;
+  if (action === 'commit') {
+    const f = state.findings.find((x) => x.id === id);
+    const message = commitMessage(f).split(/\s+/).join(' ').trim();
+    if (!message) { setStatus('Write a commit message first.', true); return; }
+    if (!confirm(`Commit the fix for #${id} with the message:\n\n${message}`)) return;
+  }
+  button.disabled = true;
+  try {
+    const f = state.findings.find((x) => x.id === id);
+    const body = action === 'commit' ? { message: commitMessage(f).split(/\s+/).join(' ').trim() } : {};
+    const done = await api(`/api/findings/${id}/fix/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (action === 'commit') delete commitDrafts[id];
+    state.findings = await api('/api/findings');
+    state.fixLogFor = null;
+    render();
+    setStatus(FIX_DONE[action](id, done));
+    const next = ['commit', 'discard'].includes(action) && state.findings.find((x) => x.fix_status === 'queued');
+    if (next) pollWhileRunning(next.id, 'fix_status');
+  } catch (e) {
+    setStatus(`Could not ${action}: ${e.message}`, true);
+    button.disabled = false;  // on success, render() has set it from what is staged
+  }
+}));
+
+// The Fix this queue across all tabs: which finding is being fixed, how many wait, and how the others ended
+function renderFixQueue() {
+  const fs = state.findings.filter((f) => f.fix_status);
+  const of = (s) => fs.filter((f) => f.fix_status === s);
+  const running = of('running')[0];
+  const paused = of('queued').find((f) => (f.fix || '').startsWith('Paused'));
+  const staged = of('staged')[0];
+  const queued = of('queued').sort(fixOrder);  // as fixed
+  const waiting = !running && !staged && queued.length && state.overview && state.overview.fix_waiting;
+  const named = (f) => withFindingLinks(`#${f.id}`);
+  const now = running ? ['Being fixed: ', ...named(running), running.fix_tests === 0 ? ', without tests' : ', with tests']
+    : staged ? ['Staged in your working tree, Commit or Discard it to go on: ', ...named(staged)]
+    : paused ? [`Paused at Claude's usage limit; next: `, ...named(paused)]
+    : waiting ? [`Waiting: ${waiting}`] : null;
+  const ended = [
+    of('committed').length ? `${of('committed').length} committed` : null,
+    of('skipped').length ? `${of('skipped').length} needed no change` : null,
+    of('failed').length ? `${of('failed').length} failed` : null,
+    of('discarded').length ? `${of('discarded').length} discarded` : null,
+  ].filter(Boolean);
+  $('fix-queue').hidden = !now && !queued.length && !ended.length;
+  $('fix-queue').replaceChildren(
+    el('p', {}, [el('b', { textContent: 'Fix this: ' }), ...(now || ['nothing being fixed'])]),
+    ...(queued.length ? [el('p', {}, [`Queued (${queued.length}, ${queuedTests(queued)}), in this order: `,
+                                      ...withFindingLinks(queued.map((f) => `#${f.id}`).join(', '))]),
+                         el('p', { className: 'queue-tests' }, [
+                           queueTestsButton('Fix all queued with tests', true, queued.every((f) => f.fix_tests !== 0)),
+                           queueTestsButton('Fix all queued without tests', false, queued.every((f) => f.fix_tests === 0))])] : []),
+    ...(ended.length ? [el('p', { className: 'sub', textContent: `So far: ${ended.join(', ')}` })] : []));
+}
+
+// Fix the build: a finding of what fails in the build, put at the head of the Fix this queue
+function fixBuildButton() {
+  const btn = el('button', { type: 'button', className: 'fix-build', textContent: 'Fix the build' });
+  const said = el('span', { className: 'sub' });
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    said.textContent = ' Reading the build from GitHub…';
+    try {
+      const done = await api('/api/fix-queue/fix-the-build', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                               body: '{}' });
+      state.findings = await api('/api/findings');
+      renderFixQueue();
+      said.textContent = ` #${done.finding_id} is at the head of the Fix this queue.`;
+    } catch (e) {
+      said.textContent = ` Could not: ${e.message}`;
+      btn.disabled = false;
+    }
+  });
+  return el('span', {}, [btn, said]);
+}
+
+// How the queued findings will be fixed: all with tests, all without, or how many of each
+function queuedTests(queued) {
+  const fast = queued.filter((f) => f.fix_tests === 0).length;
+  return !fast ? 'all with tests' : fast === queued.length ? 'all without tests'
+    : `${queued.length - fast} with tests, ${fast} without`;
+}
+
+// Switches every queued finding to Fix this with or without tests; each keeps its place in the queue
+function queueTestsButton(label, tests, already) {
+  const btn = el('button', { type: 'button', textContent: label, disabled: already });
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    try {
+      await api('/api/fix-queue/tests', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ tests }) });
+      state.findings = await api('/api/findings');
+      render();
+    } catch (e) {
+      setStatus(`Could not switch the queue: ${e.message}`, true);
+      btn.disabled = false;
+    }
+  });
+  return btn;
+}
+
+$('fix-btn').addEventListener('click', () => queueFix($('fix-btn'), true));
+$('fix-fast-btn').addEventListener('click', () => queueFix($('fix-fast-btn'), false));
+
+// Fix this, with its tests run here or (tests false) left to CI
+async function queueFix(btn, tests) {
+  const id = state.selected;
+  btn.disabled = true;
+  btn.classList.add('busy');
+  btn.textContent = 'Queuing…';
+  try {
+    const comment = $('comment').value.trim();
+    if (comment) {  // what is in the box when Fix this is pressed is saved first, so the fix follows it
+      await api(`/api/findings/${id}/feedback`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                  body: JSON.stringify({ verdict: 'comment', comment }) });
+      clearComment(id);
+    }
+    const queued = await api(`/api/findings/${id}/fix`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                          body: JSON.stringify({ tests }) });
+    const f = state.findings.find((x) => x.id === id);
+    if (f) Object.assign(f, queued);
+    // Green "Queued" on the button for a moment, then the finding moves to the Queued tab and the next one shows
+    const ahead = state.findings.filter((x) => ['queued', 'running'].includes(x.fix_status) && x.id !== id).length;
+    btn.classList.replace('busy', 'done');
+    btn.textContent = '✓ Queued';
+    setStatus(`#${id} queued for fixing${tests ? '' : ' without tests'}${ahead ? `, after ${ahead} more` : ', starting now'}. `
+      + 'It is on the Queued tab.');
+    renderFixQueue();
+    setTimeout(() => { if (state.selected === id) renderUnlessTyping(); }, 1500);
+    pollWhileRunning(id, 'fix_status');
+  } catch (e) {
+    setStatus(`Could not queue: ${e.message}`, true);
+    btn.classList.remove('busy');
+    btn.textContent = tests ? 'Fix this' : 'Fix this without tests';
+    btn.disabled = false;
+  }
+}
+
+// Rescan every security finding to review, one at a time; those Claude finds fixed move to Done
+function renderSweep() {
+  const sw = state.overview && state.overview.sweep;
+  const toReview = state.findings.filter((f) => f.status === 'suggested' && f.category === 'security').length;
+  $('sweep').hidden = state.tab !== 'review' || (!toReview && !sw);
+  $('sweep-btn').disabled = !toReview || !!(sw && sw.running);
+  $('sweep-btn').textContent = toReview ? `Rescan the ${toReview} security finding${toReview > 1 ? 's' : ''}`
+    : 'Rescan the security findings';
+  $('sweep-state').textContent = !sw ? ''
+    : sw.running ? `Rescanning: ${sw.done} of ${sw.total} done, ${sw.fixed} fixed and moved to Done so far. `
+      + 'The finding being looked at shows what Claude is doing.'
+    : `Rescanned ${sw.total} on ${fmtDate(sw.finished)}: ${sw.fixed} fixed and moved to Done. `
+      + 'Each finding shows Claude\'s answer.';
+}
+
+// While a sweep runs, fetch the overview and findings again
+function pollSweep() {
+  const poll = setInterval(async () => {
+    try {
+      [state.overview, state.findings] = await Promise.all([api('/api/overview'), api('/api/findings')]);
+    } catch { return; }
+    if (!state.overview.sweep || !state.overview.sweep.running) clearInterval(poll);
+    renderUnlessTyping();
+  }, 5000);
+}
+
+$('sweep-btn').addEventListener('click', async () => {
+  $('sweep-btn').disabled = true;
+  try {
+    state.overview.sweep = await api('/api/findings/recheck-security', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    render();
+    pollSweep();
+  } catch (e) {
+    $('sweep-state').textContent = `Could not rescan: ${e.message}`;
+    $('sweep-btn').disabled = false;
+  }
+});
+
+// Until a background judgement about finding `id` (its `field` is 'running') is made, fetch the findings again
+function pollWhileRunning(id, field) {
+  const poll = setInterval(async () => {
+    const findings = await api('/api/findings').catch(() => null);
+    const g = findings && findings.find((x) => x.id === id);
+    if (!g || !['running', 'queued'].includes(g[field])) clearInterval(poll);
+    if (findings) { state.findings = findings; renderUnlessTyping(); }
+  }, 5000);
+}
+
+$('recheck-btn').addEventListener('click', async () => {
+  const id = state.selected;
+  $('recheck-btn').disabled = true;
+  try {
+    const started = await api(`/api/findings/${id}/recheck`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                                body: '{}' });
+    const f = state.findings.find((x) => x.id === id);
+    if (f) Object.assign(f, started);
+    render();
+    pollWhileRunning(id, 'recheck_status');
+  } catch (e) {
+    setStatus(`Could not rescan: ${e.message}`, true);
+    $('recheck-btn').disabled = false;
+  }
+});
+
+// Trace history: the commits that changed the finding's lines (git, at once), oldest first, and which one introduced
+// the problem (judged by Claude in the background, kept with the finding)
+function renderHistory(f) {
+  const judging = f.trace_status === 'running';
+  const verdict = f.introduced || (judging ? 'Working out which commit introduced it…'
+    : f.trace_status === 'failed' ? 'Could not work out which commit introduced it.' : '');
+  $('d-introduced').hidden = !verdict;
+  // Who, When, Commit and Where are kept split out with the finding (introduced_*); the rest of the answer follows
+  const m = f.introduced_commit && f.introduced === verdict
+    && [null, f.introduced_commit, f.introduced_when, f.introduced_who, f.introduced_where, verdict.replace(/^Introduced in [^:]*: /, '')];
+  const years = (date) => {
+    const days = Math.floor((Date.now() - Date.parse(date)) / 86400000);
+    return days >= 730 ? `${Math.floor(days / 365)} years ago` : days >= 60 ? `${Math.floor(days / 30)} months ago` : daysAgo(Date.parse(date) / 1000);
+  };
+  $('d-introduced').replaceChildren(...(m ? [
+    el('dl', {}, [
+      el('dt', { textContent: 'Who' }), el('dd', { textContent: m[3] }),
+      el('dt', { textContent: 'When' }), el('dd', { textContent: `${m[2]} (${years(m[2])})` }),
+      el('dt', { textContent: 'Commit' }), el('dd', { className: 'mono', textContent: m[1] }),
+      ...(m[4] ? [el('dt', { textContent: 'Where' }), el('dd', { className: 'mono', textContent: m[4] })] : []),
+    ]),
+    el('p', { textContent: m[5] }),
+  ] : [el('p', {}, [el('b', { textContent: 'Claude, reading the diffs: ' }), verdict])]));
+  $('d-history').replaceChildren(...(f.history ? [el('b', { textContent: 'Every commit that changed these lines in today\'s files (git log -L):' })] : []),
+                                 ...(f.history || []).flatMap((h) => [
+    el('div', { className: 'file', textContent: h.file }),
+    h.commits.length
+      ? el('ol', {}, h.commits.map((c, i) => el('li', {}, [
+          `${c.commit} ${c.date} ${c.author}: ${c.subject}`,
+          ...(i === 0 ? [el('span', { className: 'first', textContent: ' (oldest in this file, often a move from elsewhere)' })] : []),
+        ])))
+      : el('p', { textContent: h.error ? `No history: ${h.error}` : 'No history found.' }),
+  ]));
+  $('trace-btn').disabled = judging;
+  $('trace-btn').textContent = f.history ? 'Trace history again' : 'Trace history';
+}
+
+$('trace-btn').addEventListener('click', async () => {
+  const id = state.selected;
+  $('trace-btn').disabled = true;
+  try {
+    const traced = await api(`/api/findings/${id}/trace`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                             body: '{}' });
+    const f = state.findings.find((x) => x.id === id);
+    if (f) Object.assign(f, traced);
+    render();
+    pollWhileRunning(id, 'trace_status');  // the judgement takes a minute or so
+  } catch (e) {
+    setStatus(`Could not trace the history: ${e.message}`, true);
+    $('trace-btn').disabled = false;
+  }
+});
+
+// The finding as text for the agent working on it: what, why, where, the change, and when it came in. No scores.
+function findingText(f) {
+  const commits = f.evidence_commits || {};
+  const evidence = (f.evidence || '').replace(/\b[0-9a-f]{7,40}\b/g,
+    (sha) => commits[sha] ? `${sha.slice(0, 9)} (${daysAgo(commits[sha].ts)})` : sha);  // a commit: short, and how old
+  return [
+    `# ${f.title}`,
+    `Senti finding #${f.id} (${f.key}), ${f.category}, on ${state.instance}`,
+    ...(f.summary ? ['', f.summary] : []),
+    '', '## Evidence', evidence,
+    '', '## Why it happens', f.hypothesis,
+    '', '## Where', ...f.files.map((x) => `- ${x}`),
+    '', '## Suggested change', f.suggested_fix,
+    ...(f.introduced ? ['', '## History', f.introduced] : []),
+    ...(f.recheck ? ['', '## Still an issue?', f.recheck] : []),
+  ].join('\n');
+}
+
+const COPY_ICON = $('copy-btn').innerHTML;
+let copiedTimer;
+$('copy-btn').addEventListener('click', async () => {
+  const f = state.findings.find((x) => x.id === state.selected);
+  if (!f) return;
+  try {
+    await navigator.clipboard.writeText(findingText(f));
+    setStatus(`Copied #${f.id} for the agent.`);
+    // The icon turns into a green tick for a moment, where you clicked: the status line is further down
+    const btn = $('copy-btn');
+    btn.classList.add('copied');
+    btn.innerHTML = ICONS.ok.replace(/"14"/g, '"18"');
+    clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = COPY_ICON; }, 1500);
+  } catch (e) {
+    setStatus(`Could not copy: ${e.message}`, true);
+  }
+});
+
+function setStatus(text, error = false) {
+  $('status').textContent = text;
+  $('status').classList.toggle('error', error);
+}
+
+// Takes back the feedback just given (within 10 minutes): the finding's status goes back as it was
+function undoLink(id) {
+  const a = el('a', { href: location.hash || '#', textContent: 'Undo' });
+  a.onclick = async (e) => {
+    e.preventDefault();
+    try {
+      const done = await api(`/api/findings/${id}/undo`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      state.findings = await api('/api/findings');
+      loadLearned();
+      const f = state.findings.find((x) => x.id === id);
+      if (f) Object.assign(state, { tab: tabOf(f), selected: id });
+      render();
+      setStatus(`Undone: “${done.undone}” on #${id}.`);
+    } catch (err) {
+      setStatus(`Could not undo: ${err.message}`, true);
+    }
+  };
+  return a;
+}
+
+async function respond(verdict) {
+  const id = state.selected;
+  if (id == null) return;
+  if (verdict === 'fixed' && !confirm(`Mark #${id} as fixed? It moves to Done.`)) return;
+  if (verdict === 'dismissed' && !confirm(`Dismiss #${id}? It and its log messages are hidden for good; this cannot be undone.`)) return;
+  const buttons = document.querySelectorAll('button[data-verdict]');
+  buttons.forEach((b) => { b.disabled = true; });
+  const rated = state.findings.find((x) => x.id === id);
+  const before = rated && rated.rating;
+  try {
+    // A rating shows as selected at once (and goes back if it cannot be recorded)
+    if (rated && document.querySelector(`.grades button[data-verdict="${verdict}"]`)) {
+      document.querySelectorAll('.grades button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.verdict === verdict)));
+      rated.rating = verdict;
+    }
+    const done = await api(`/api/findings/${id}/feedback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ verdict, comment: $('comment').value }),
+    });
+    clearComment(id);
+    state.findings = await api('/api/findings');
+    render();
+    loadLearned();
+    const said = { relevant: 'Relevant', important: 'Important', urgent: 'Urgent', later: 'Skip for now', dismissed: 'Dismiss',
+                   fixed: 'Should be fixed now' }[verdict] || verdict;
+    const queue = verdict !== 'urgent' ? ''
+      : done.not_queued ? ` Not queued for fixing: ${done.not_queued}`
+      : ' It is at the head of the Fix this queue; Undo leaves it there.';
+    setStatus(verdict !== 'comment' ? `Recorded “${said}” for #${id}.${queue}`
+      : done.not_answered ? `Comment saved for #${id}. Senti cannot answer it here: ${done.not_answered}`
+      : `Comment saved for #${id}. Senti is answering it.`);
+    if (verdict === 'comment' && !done.not_answered) pollWhileRunning(id, 'reply_status');
+    if (verdict !== 'dismissed') $('status').append(' ', undoLink(id));
+    if (verdict === 'urgent' && !done.not_queued) pollWhileRunning(id, 'fix_status');
+  } catch (e) {
+    if (rated) {
+      rated.rating = before;
+      document.querySelectorAll('.grades button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.verdict === before)));
+    }
+    setStatus(`Could not record: ${e.message}`, true);
+  } finally {
+    buttons.forEach((b) => { b.disabled = false; });
+  }
+}
+
+document.querySelectorAll('button[data-verdict]').forEach((b) => { b.onclick = () => respond(b.dataset.verdict); });
+
+// What Senti has learned from your responses on every instance of this one's kind: shown only once it changes the order
+async function loadLearned() {
+  state.learned = await api('/api/preferences').catch(() => null);
+  renderLearned();
+}
+
+function renderLearned() {
+  const p = state.learned;
+  const kinds = p ? Object.entries(p.categories) : [];
+  const first = kinds.filter(([, n]) => n.weight > 1);
+  const later = kinds.filter(([, n]) => n.weight < 1);
+  const box = $('learned');
+  box.hidden = !first.length && !later.length;
+  if (box.hidden) return;
+  const of = (n) => n.acted + n.dismissed;
+  const forget = el('button', { type: 'button', textContent: 'Forget', title: `Ignore your responses so far, on every ${p.kind || 'such'} instance` });
+  forget.dataset.testid = 'learned-forget';
+  forget.onclick = async () => {
+    if (!confirm('Forget what Senti has learned from your responses? It starts again from your next one.')) return;
+    try {
+      state.learned = await api('/api/preferences/forget', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      state.findings = await api('/api/findings');
+      render();
+      renderLearned();
+      setStatus('Senti has forgotten your responses so far.');
+    } catch (e) {
+      setStatus(`Could not forget: ${e.message}`, true);
+    }
+  };
+  const parts = [];
+  if (first.length) parts.push('shown first: ' + first.map(([c, n]) => `${c} (you acted on ${n.acted} of ${of(n)})`).join(', '));
+  if (later.length) parts.push('shown later: ' + later.map(([c, n]) => `${c} (you dismissed ${n.dismissed} of ${of(n)})`).join(', ')
+    + `, except findings of impact ${p.high_impact} or more`);
+  box.replaceChildren(`From your responses on ${p.kind || 'these'} services, ${parts.join('; ')}. `, forget);
+}
+
+// What refreshes by itself never redraws the findings while someone is in a field: the redraw waits, and happens
+// once they leave it. Unsaved comments are kept per finding (commentDrafts), so a redraw never moves one.
+let renderWaiting = false;
+const typing = () => {
+  const a = document.activeElement;
+  return Boolean(a && (a.matches('textarea, input, select') || a.isContentEditable));
+};
+function renderUnlessTyping() {
+  if (typing()) { renderWaiting = true; return; }
+  renderWaiting = false;
+  render();
+}
+const renderIfWaiting = () => setTimeout(() => { if (renderWaiting) renderUnlessTyping(); }, 0);
+document.addEventListener('focusout', renderIfWaiting);
+
+async function load() {
+  try {
+    [state.overview, state.findings] = await Promise.all([api('/api/overview'), api('/api/findings')]);
+    renderHeader();
+    render();
+    loadLearned();
+    if (state.overview.sweep && state.overview.sweep.running) pollSweep();
+    // Refresh until the last finding queued for fixing is done
+    const fixing = state.findings.filter((f) => f.fix_status === 'queued').sort((a, b) => b.fix_at - a.fix_at)[0]
+      || state.findings.find((f) => f.fix_status === 'running');
+    if (fixing) pollWhileRunning(fixing.id, 'fix_status');
+  } catch (e) {
+    $('watching').textContent = `Could not load: ${e.message}`;
+  }
+}
+
+// The grid: one row per service (in the order they come), one column per environment (from a developer's machine to
+// production), each cell the service's instances there. Hidden when there is only one instance. The open one is kept
+// in the URL's #.
+function instanceButton(i, label) {
+  const age = commitAge(i.commit);
+  const b = el('button', { type: 'button', title: `${i.service} in ${i.environment}: ${i.obp_base_url}`
+    + (i.commit ? ` · commit ${i.commit.git_commit.slice(0, 12)}` : '')
+    + (i.connected ? ' · connected' : ' · not connected')
+    + (i.problems ? ` · ${i.problems} problem${i.problems > 1 ? 's' : ''} to fix` : '')
+    + (i.to_review ? ` · ${i.to_review} to review` : '') }, [label]);
+  if (age) b.append(el('span', { className: 'age', textContent: age }));
+  // Green: connected. Amber: connected, with something else to fix. Red: not connected.
+  b.append(el('span', { className: 'flag' + (!i.connected ? '' : i.problems ? ' warn' : ' good'), role: 'img',
+                        ariaLabel: !i.connected ? 'not connected' : i.problems ? 'connected, something to fix' : 'connected' }));
+  if (i.to_review) b.append(el('span', { className: 'count', textContent: String(i.to_review),
+                                          ariaLabel: `${i.to_review} to review` }));
+  b.setAttribute('aria-pressed', String(state.instance === i.name));
+  b.onclick = () => openInstance(i.name);
+  return b;
+}
+
+function renderInstances() {
+  const grid = $('fleet');
+  grid.hidden = state.instances.length < 2;
+  if (grid.hidden) return;
+  const services = [...new Set(state.instances.map((i) => i.service))];
+  const environments = [...new Set(state.instances.map((i) => i.environment))]
+    .sort((a, b) => state.instances.find((i) => i.environment === a).environment_rank
+                  - state.instances.find((i) => i.environment === b).environment_rank);
+  // A cell's instance is named by where it is deployed: its own name, or its OBP-API instance's for an OBP app
+  const placeOf = (i) => i.parent || i.name;
+  const head = el('tr', {}, [el('th', { scope: 'col', textContent: 'Service' }),
+                             ...environments.map((e) => el('th', { scope: 'col', textContent: e }))]);
+  const rows = services.map((service) => {
+    const of = state.instances.filter((i) => i.service === service);
+    return el('tr', {}, [
+      el('th', { scope: 'row' }, [service, el('span', { className: 'kind', textContent: of[0].kind })]),
+      ...environments.map((e) => el('td', {}, of.filter((i) => i.environment === e)
+        .map((i) => instanceButton(i, placeOf(i))))),
+    ]);
+  });
+  grid.replaceChildren(el('table', {}, [el('thead', {}, [head]), el('tbody', {}, rows)]));
+}
+
+function openInstance(name) {
+  if (name === state.instance) return;
+  state.instance = name;
+  Object.assign(state, { tab: 'review', selected: null, findings: [], overview: null });
+  activityData = null;
+  history.replaceState(null, '', '#' + encodeURIComponent(name));
+  renderInstances();
+  setStatus('');
+  load();
+  loadActivity();
+  loadAnalysis();
+  $('sonar-box').hidden = true;
+  $('sonar-more').open = false;
+  loadSonar();  // shows the panel only when the instance names a SonarCloud project
+}
+
+// --- Activity --------------------------------------------------------------------------------
+const SOURCE_NAMES = { 'log:error': 'Error log', 'log:warning': 'Warning log', 'log:info': 'Info log',
+                       'log:debug': 'Debug log', telemetry: 'Telemetry', metrics: 'Aggregate metrics' };
+const ICONS = {
+  ok: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>',
+  warn: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/></svg>',
+  bad: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+};
+const ago = (seconds) => seconds < 90 ? `${Math.max(0, Math.round(seconds))}s ago`
+  : seconds < 5400 ? `${Math.round(seconds / 60)} min ago` : `${(seconds / 3600).toFixed(1)}h ago`;
+const clock = (ts) => new Date(ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+const daysAgo = (ts) => {
+  const days = Math.floor((Date.now() / 1000 - ts) / 86400);
+  return days < 1 ? 'today' : days === 1 ? '1 day ago' : `${days} days ago`;
+};
+const dayClock = (ts) => new Date(ts * 1000).toDateString() === new Date().toDateString() ? `today ${clock(ts)}`
+  : `${new Date(ts * 1000).toLocaleDateString([], { day: 'numeric', month: 'short' })} ${clock(ts)}`;
+let activityData = null, activityLoadedAt = 0;
+
+function stateEl(kind, label) {
+  const span = el('span', { className: `state ${kind}` });
+  span.innerHTML = ICONS[kind];  // fixed icon markup, no data
+  span.append(label);
+  return span;
+}
+
+function sourceLine(s) {
+  if (s.source.startsWith('log:')) return `+${fmtNum(s.new)} new lines · ${fmtNum(s.fetched)} in OBP's cache`;
+  if (s.source === 'telemetry') return `${fmtNum(s.fetched)} values stored`;
+  if (s.source === 'metrics') return !s.ok ? 'No buckets fetched'
+    : s.fetched ? `${fmtNum(s.fetched)} bucket${s.fetched > 1 ? 's' : ''} fetched` : 'Up to date, waiting for the next bucket';
+  return `${fmtNum(s.fetched)} fetched`;
+}
+
+function renderActivity() {
+  const a = activityData;
+  if (!a) return;
+  const elapsed = Date.now() / 1000 - activityLoadedAt;
+  const nowTs = a.now + elapsed;
+  const last = Math.max(0, ...a.sources.map((s) => s.ts));
+  const stale = !last || nowTs - last > 3 * a.poll_seconds;
+  const failing = a.sources.filter((s) => !s.ok);
+  $('a-dot').className = 'dot ' + (stale ? 'warn' : failing.length ? 'warn live' : 'live');
+  $('a-state').textContent = !last ? 'No polls yet' : stale ? 'Collector not polling'
+    : failing.length ? `Watching, ${failing.length} source${failing.length > 1 ? 's' : ''} failing` : 'Watching';
+  $('a-when').textContent = !last ? 'Start it with: uv run senti run'
+    : stale ? `Last poll ${ago(nowTs - last)}. Is the collector running?`
+    : `Last poll ${ago(nowTs - last)} · ` + (last + a.poll_seconds > nowTs ? `next in about ${Math.round(last + a.poll_seconds - nowTs)}s` : 'next one due now');
+}
+
+function renderActivityDetails() {
+  const a = activityData;
+  const t = a.totals;
+  $('a-new').hidden = !a.new_signatures.length;
+  $('a-new-title').textContent = `New kinds of log message in the last 24 hours (${fmtNum(t.new_signatures_last_day)})`;
+  $('a-new-list').replaceChildren(...a.new_signatures.map((n) => el('li', {}, [
+    el('b', { textContent: n.level.toUpperCase() }),
+    ` ${fmtNum(n.total_count)} since ${dayClock(n.first_seen)} · signature ${n.id} · `,
+    el('span', { className: 'tpl', textContent: n.template.slice(0, 300) }),
+  ])));
+
+  const isOk = (s) => s.ok && a.now - s.ts <= 3 * a.poll_seconds && !s.gap;
+  const fine = a.sources.filter(isOk);
+  const okLine = fine.length ? [el('p', { className: 'sources-ok' }, [
+    stateEl('ok', fine.length === a.sources.length ? `All ${fine.length} sources OK` : `${fine.length} OK`),
+    el('span', { className: 'sub', textContent: fine.map((s) => SOURCE_NAMES[s.source] || s.source).join(', ') }),
+  ])] : [];
+  $('a-ok').replaceChildren(...okLine);
+  $('a-sources').replaceChildren(...a.sources.filter((s) => !isOk(s)).map((s) => {
+    const stale = a.now - s.ts > 3 * a.poll_seconds;
+    const state = !s.ok ? stateEl('bad', 'Failing') : stale ? stateEl('warn', 'Stale') : s.gap ? stateEl('warn', 'Some missed') : stateEl('ok', 'OK');
+    const children = [
+      el('div', { className: 'name' }, [el('span', { textContent: SOURCE_NAMES[s.source] || s.source }), state]),
+      el('div', { className: 'line', textContent: `${sourceLine(s)} · ${clock(s.ts)}` }),
+      el('div', { className: 'line', textContent: s.failed_last_hour
+        ? `${s.failed_last_hour} of ${s.polls_last_hour} polls failed in the last hour` + (s.last_ok ? '' : ', never succeeded')
+        : `${s.polls_last_hour} polls in the last hour, none failed` }),
+    ];
+    if (!s.ok && s.error) children.push(el('div', { className: 'err', textContent: s.error.slice(0, 220) }));
+    return el('div', { className: 'source' }, children);
+  }));
+
+  renderChart($('chart-logs'), 'Log lines', a.buckets.map((b) => b.log_lines), a, 'log lines');
+  const calls = a.buckets.map((b) => b.api_calls);
+  const metrics = a.sources.find((s) => s.source === 'metrics');
+  renderChart($('chart-calls'), 'API calls', calls, a, 'API calls',
+    calls.every((v) => v == null) ? (metrics && !metrics.ok ? 'No data: aggregate metrics are failing (see above).'
+                                                            : 'No data yet: buckets are fetched after they end.') : null);
+}
+
+function renderChart(node, title, values, a, unit, emptyNote) {
+  const known = values.filter((v) => v != null);
+  const max = Math.max(1, ...known);
+  const total = known.reduce((x, y) => x + y, 0);
+  const size = a.bucket_minutes * 60;
+  const note = el('p', { className: 'note', textContent: emptyNote
+    || `${fmtNum(total)} in the last ${Math.round(values.length * a.bucket_minutes / 60)}h. Hover a bar for its ${a.bucket_minutes} minutes.` });
+  const plot = el('div', { className: 'plot', role: 'img',
+    ariaLabel: `${title} per ${a.bucket_minutes} minutes, last ${values.length} buckets, peak ${fmtNum(max)}` });
+  if (!emptyNote) plot.append(el('div', { className: 'gridline' }), el('span', { className: 'ymax', textContent: fmtNum(max) }));
+  const defaultNote = note.textContent;
+  a.buckets.forEach((b, i) => {
+    const v = values[i];
+    const bar = el('div', { className: 'bucket' + (v == null ? ' none' : v === 0 ? ' zero' : ''), tabIndex: v == null ? -1 : 0 },
+                   [el('span')]);
+    if (v) bar.firstChild.style.height = `${Math.max(4, (v / max) * 100)}%`;
+    const label = `${clock(b.start)}–${clock(b.start + size)} · ${v == null ? 'no data' : `${fmtNum(v)} ${unit}`}`;
+    bar.title = label;
+    bar.onmouseenter = bar.onfocus = () => { note.textContent = label; };
+    bar.onmouseleave = bar.onblur = () => { note.textContent = defaultNote; };
+    plot.append(bar);
+  });
+  const table = el('table', {}, [el('tr', {}, [el('th', { textContent: 'From' }), el('th', { textContent: title })]),
+    ...a.buckets.map((b, i) => el('tr', {}, [el('td', { textContent: clock(b.start) }),
+                                             el('td', { textContent: values[i] == null ? '—' : fmtNum(values[i]) })]))]);
+  node.replaceChildren(
+    el('h3', { textContent: `${title} per ${a.bucket_minutes} min` }), note, plot,
+    el('div', { className: 'xaxis' }, [el('span', { textContent: clock(a.buckets[0].start) }), el('span', { textContent: 'now' })]),
+    el('details', {}, [el('summary', { textContent: 'Show as table' }), table]),
+  );
+}
+
+// --- Setup: what stops Senti from watching this instance, and what to do --------------------
+function renderHealth(h) {
+  renderConnection(h);
+  const problems = h.problems;
+  $('setup').hidden = !problems.length;
+  if (!problems.length) return;
+  $('setup-title').textContent = problems.length === 1 ? '1 thing to fix before Senti can watch this instance'
+    : `${problems.length} things to fix before Senti can watch this instance`;
+  $('setup-intro').textContent = 'Most blocking first. Senti keeps retrying, so this clears by itself within a poll of the fix.'
+    + (h.more_may_follow ? ' Until the first is fixed OBP-API cannot say which Scopes are missing, so more may appear.' : '');
+  $('setup-problems').replaceChildren(...problems.map((p, i) => {
+    const children = [
+      el('div', { className: 'what' }, [el('span', { className: 'num', textContent: `${i + 1}.` }), el('span', { textContent: p.title })]),
+      el('p', { className: 'do', textContent: p.action }),
+      ...(p.link ? [el('p', { className: 'do' }, [el('a', { href: p.link.href, target: '_blank', rel: 'noopener', textContent: p.link.text })])] : []),
+      el('p', { className: 'affects', textContent: `Affects: ${p.sources.join(', ')}` + (p.since ? ` · last seen ${dayClock(p.since)}` : '') }),
+    ];
+    if (p.error) children.push(el('details', {}, [el('summary', { textContent: 'What Senti got' }), el('pre', { textContent: p.error })]));
+    return el('li', { className: `problem ${p.severity}` }, children);
+  }));
+}
+
+// Whether Senti is connected to the open instance: green when it is, red with the most blocking cause when not
+function renderConnection(h) {
+  const open = state.instances.find((i) => i.name === state.instance);
+  const line = $('connection');
+  line.hidden = false;
+  const bad = h.problems.find((p) => p.severity === 'bad');
+  const app = h.platform_app;
+  if (h.connected) {
+    // One short line; the details are in the tooltip
+    line.className = 'connection ok';
+    line.textContent = '✓ Connected' + (open && open.parent ? '' : app && app.ok ? ` as Platform App "${app.label}"` : '');
+    line.title = open && open.parent ? `With ${open.parent}'s Platform App token`
+      : app && app.ok ? `Consumer ${app.consumer_id} · all its Scopes held` : '';
+  } else {
+    line.title = '';
+    line.className = 'connection bad';
+    line.replaceChildren('✗ Not connected', el('span', { className: 'sub',
+      textContent: bad ? `: ${bad.title} (see below)` : ': no successful poll yet' }));
+  }
+}
+
+async function loadInstances() {
+  state.instances = await api('/api/instances');
+  renderInstances();
+}
+
+async function loadActivity() {
+  try {
+    api('/api/health').then(renderHealth).catch(() => {});
+    activityData = await api('/api/activity');
+    activityLoadedAt = Date.now() / 1000;
+    renderActivityDetails();
+    renderActivity();
+  } catch (e) {
+    $('a-dot').className = 'dot warn';
+    $('a-state').textContent = 'Cannot reach the Senti page server';
+    $('a-when').textContent = e.message;
+  }
+}
+
+async function refresh() {
+  loadInstances().catch(() => {});
+  await loadActivity();
+  try {
+    [state.overview, state.findings] = await Promise.all([api('/api/overview'), api('/api/findings')]);
+    renderHeader();
+    renderUnlessTyping();
+  } catch (e) { /* the activity section already says so */ }
+}
+
+setInterval(renderActivity, 1000);
+setInterval(refresh, 30000);
+
+// --- Analyst ---------------------------------------------------------------------------------
+const RUN_STATUS = { running: 'Running', done: 'Done', failed: 'Failed' };
+const duration = (seconds) => seconds < 90 ? `${Math.round(seconds)}s` : `${Math.round(seconds / 60)} min`;
+let analysisTimer = null, analysisWasRunning = false;
+
+function renderAnalysis(n) {
+  const run = n.runs[0];
+  const running = run && run.status === 'running';
+  const check = n.last_check;
+  $('n-dot').className = 'dot ' + (running ? 'live' : n.unavailable ? 'warn' : run && run.status === 'failed' ? 'warn' : '');
+  $('analysis-title').textContent = running ? 'Analyst at work' : n.unavailable ? 'Analyst not scheduled' : 'Analyst idle';
+  const next = n.next_check ? `next check around ${clock(n.next_check)}` : null;
+  $('n-when').textContent = running
+    ? `Started ${ago(n.now - run.started_at)} · ${run.trigger} · ${run.steps_total} steps so far`
+    : n.unavailable ? `${n.unavailable}. Run it by hand with: uv run senti analyse`
+    : [check ? `${check.reason} (checked ${clock(check.ts)})` : 'Starting', next].filter(Boolean).join(' · ');
+
+  $('n-steps-title').textContent = running ? 'What it is doing' : run ? `What it did in run #${run.id} (${dayClock(run.started_at)})` : 'What it did';
+  const runNow = $('run-now');
+  runNow.disabled = running || Boolean(n.by_hand_unavailable);
+  runNow.title = running ? 'An analysis is running' : n.by_hand_unavailable
+    || 'Starts the analyst now, whatever its schedule says: it reads what was collected, investigates the '
+       + `source, records findings and writes a digest.`;
+  autoOpen($('n-more'), running || Boolean(run && run.status === 'failed'));
+  const showResult = run && !running && (run.result || run.error);
+  $('n-result').hidden = !showResult;
+  if (showResult) $('n-result').replaceChildren(...withFindingLinks(run.error ? `${run.error}${run.result ? '\n' + run.result : ''}` : run.result));
+
+  const steps = run ? run.steps : [];
+  const items = steps.map((s, i) => {
+    const last = i === steps.length - 1;
+    const text = s.kind === 'thinking' ? 'Thinking' : s.text;
+    const span = el('span', { className: s.kind + (s.kind === 'thinking' && last && running ? ' thinking-now' : '') }, withFindingLinks(text));
+    return el('li', {}, [el('time', { textContent: clock(s.ts) }), span]);
+  });
+  const hidden = run ? run.steps_total - steps.filter((s) => s.kind !== 'thinking').length : 0;
+  if (hidden > 0) items.unshift(el('li', { className: 'more', textContent: `${hidden} earlier steps not shown` }));
+  if (!items.length) items.push(el('li', { className: 'more', textContent: run ? 'No steps recorded.'
+    : 'The analyst has not run yet. It starts once enough hours have been watched.' }));
+  const list = $('n-steps');
+  const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 24;
+  list.replaceChildren(...items);
+  if (atBottom) list.scrollTop = list.scrollHeight;
+
+  $('n-waiting').replaceChildren(...(n.waiting.length ? n.waiting.map((w) => el('li', {}, [
+    el('b', { textContent: w.level.toUpperCase() }), ' ',
+    el('span', { className: 'n', textContent: `${fmtNum(w.window_count)} in ${o6()}h` + (w.prev_count ? ` (${fmtNum(w.prev_count)} before)` : ' (new)')
+      + (w.endpoint ? ` · ${w.endpoint}` : '') }),
+    el('span', { className: 'tpl', textContent: w.template.slice(0, 200) }),
+  ])) : [el('li', { className: 'n', textContent: 'Every recent problem already has a finding.' })]));
+
+  renderClaude(n);
+
+  $('n-runs').replaceChildren(...(n.runs.length ? n.runs.map((r) => el('li', {}, [
+    el('span', { textContent: `#${r.id} ${clock(r.started_at)}` }),
+    stateEl(r.status === 'done' ? 'ok' : r.status === 'failed' ? 'bad' : 'warn', RUN_STATUS[r.status] || r.status),
+    el('span', { textContent: r.ended_at ? duration(r.ended_at - r.started_at) : '' }),
+    el('span', { className: 'why', textContent: r.trigger }),
+  ])) : [el('li', { className: 'why', textContent: 'None yet.' })]));
+  return running;
+}
+
+const o6 = () => (state.overview ? state.overview.window_hours : 6);
+
+// A Details section opens by itself when something needs attention, and closes again after; in between, it stays
+// as the person left it
+function autoOpen(details, attention) {
+  if (details.dataset.attention !== String(attention)) details.open = attention;
+  details.dataset.attention = String(attention);
+}
+
+// Whether Claude Code (the analyst's LLM) answers: the last check from the page, else the last run that finished
+let claudeChecking = false;
+function renderClaude(n) {
+  const c = n.claude_check, done = n.last_answered;
+  const [dot, text] = claudeChecking ? ['live', 'Claude Code: asking it a question…']
+    : c && c.ok && (!done || c.ts >= done.ended_at) ? ['good', `Claude Code answers: ${c.model || 'model not reported'}`
+        + ` replied in ${c.seconds}s` + ` · checked ${dayClock(c.ts)}`]
+    : c && !c.ok && (!done || c.ts >= done.ended_at) ? ['bad', `Claude Code did not answer (checked ${dayClock(c.ts)}): ${c.error}`]
+    : done ? ['good', `Claude Code answered in run #${done.id}, which finished ${dayClock(done.ended_at)}`]
+    : n.by_hand_unavailable ? ['warn', `Claude Code cannot run here: ${n.by_hand_unavailable}`]
+    : ['', 'Claude Code: not checked yet'];
+  $('claude-dot').className = 'dot ' + dot;
+  $('claude-state').textContent = text;
+  $('claude-check').disabled = claudeChecking;
+}
+
+async function loadAnalysis() {
+  clearTimeout(analysisTimer);
+  let running = false;
+  try {
+    running = renderAnalysis(await api('/api/analysis'));
+    if (analysisWasRunning && !running) refresh();  // a run just ended: show its findings
+    analysisWasRunning = running;
+  } catch (e) {
+    $('n-when').textContent = `Could not load: ${e.message}`;
+  }
+  analysisTimer = setTimeout(loadAnalysis, running ? 3000 : 30000);
+}
+
+// The source review is shared by all instances: one view, refreshed every minute
+async function loadSource() {
+  try {
+    // Not through api(): that drops replies when the instance tab changes, and this view has no instance
+    const response = await fetch('/api/source');
+    const s = await response.json();
+    if (!response.ok) throw new Error(s.error || response.statusText);
+    $('source-when').textContent = s.total
+      ? `${fmtNum(s.reviewed)} of ${fmtNum(s.total)} endpoints reviewed, across all instances · `
+        + `${fmtNum(s.files)} files and ${fmtNum(s.functions)} functions in big files read`
+      : 'No instance has listed its endpoints yet. The collector does that once a day.';
+    $('source-tiers').replaceChildren(...s.tiers.map((t) =>
+      el('li', { textContent: `${t.label}: ${fmtNum(t.reviewed)} of ${fmtNum(t.total)}` })));
+    $('source-recent').replaceChildren(...(s.recent.length ? s.recent.map((r) =>
+      el('li', { textContent: `${dayClock(r.reviewed_at)} · ${r.operation_id} · commit ${r.git_commit.slice(0, 12)}` }))
+      : [el('li', { className: 'n', textContent: 'Nothing yet: the analyst reviews a few endpoints each run.' })]));
+    $('source-instances').replaceChildren(...s.instances.map((i) => el('li', {}, !i.listed_at
+      ? [el('b', { textContent: i.name }), ': endpoints not listed yet']
+      : [el('b', { textContent: i.name }),
+         `: ${fmtNum(i.endpoints)} endpoints, listed ${dayClock(i.listed_at)} at commit ${(i.git_commit || '?').slice(0, 12)}`,
+         el('br'), `API versions (${i.versions.length}): ${i.versions.join(', ')}`,
+         el('br'), i.roles === null ? 'Roles held: unknown (needs GET /reachable-roles and the Scope CanGetReachableRoles)'
+           : `Roles held: ${fmtNum(i.roles)}`])));
+    renderScanner(s.scanner);
+  } catch (e) {
+    $('source-when').textContent = `Could not load: ${e.message}`;
+  }
+  clearTimeout(sourceTimer);
+  sourceTimer = setTimeout(loadSource, sourceScanning ? 5000 : 60000);
+}
+let sourceTimer = null, sourceScanning = false;
+
+// The suggested SonarCloud settings for the instance's project; read when opened (it asks SonarCloud)
+async function loadSonar() {
+  const shown = state.instance;
+  $('sonar-when').textContent = 'Reading SonarCloud…';
+  try {
+    const s = await api('/api/sonar-settings');
+    if (shown !== state.instance) return;
+    $('sonar-box').hidden = !s.project;
+    if (!s.project) return;
+    const issues = (c) => [c.vulnerabilities && `${c.vulnerabilities} vulnerabilities`, c.bugs && `${c.bugs} bugs`,
+      c.security_hotspots && `${c.security_hotspots} security hotspots`, c.code_smells && `${c.code_smells} code smells`]
+      .filter(Boolean).join(', ') || 'no issues';
+    $('sonar-when').textContent = `${s.project} · SonarCloud reads ${s.reads}`
+      + (s.changed ? ' · a change is suggested' : ' · nothing to change');
+    $('sonar-notes').replaceChildren(...s.notes.map((n) => el('li', { textContent: n })));
+    $('sonar-effects').replaceChildren(...(s.effects.length ? s.effects.map((e) => el('li', {}, [
+      el('code', { textContent: e.lines.join('  ') }), el('br'), `${e.what} Today SonarCloud reports there: ${issues(e.counts)}.`]))
+      : [el('li', { className: 'n', textContent: 'Nothing: there are no test or developer-tool folders to sort out.' })]));
+    $('sonar-file-title').textContent = `Suggested ${s.reads}: copy it to the root of the repository and commit it`;
+    $('sonar-suggested').textContent = s.suggested;
+    $('sonar-current').textContent = Object.entries(s.current)
+      .map(([name, text]) => `# ${name}${text == null ? ': none' : ''}\n${text || ''}`).join('\n');
+  } catch (e) {
+    $('sonar-when').textContent = `Could not read SonarCloud: ${e.message}`;
+  }
+}
+$('sonar-more').addEventListener('toggle', () => { if ($('sonar-more').open) loadSonar(); });
+$('sonar-copy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('sonar-suggested').textContent);
+    setStatus('Copied the suggested settings file.');
+  } catch (e) {
+    setStatus(`Could not copy: ${e.message}`, true);
+  }
+});
+
+function renderScanner(sc) {
+  const current = sc.scans[0];
+  sourceScanning = sc.running;
+  $('scan-dot').className = 'dot ' + (sc.running ? 'live' : sc.on && !sc.unavailable ? 'good' : 'bad');
+  $('scan-go').disabled = sc.on || Boolean(sc.unavailable);
+  $('scan-stop').disabled = !sc.on && !sc.running;
+  const each = `${sc.endpoints_per_scan} endpoints every ${sc.every_minutes} min`;
+  $('scan-state').textContent = sc.unavailable ? `Scanner cannot run: ${sc.unavailable}`
+    : sc.running ? `Scanning: scan #${current.id} started ${clock(current.started_at)}` + (current.last_step ? ` · ${current.last_step}` : '')
+      + (sc.on ? '' : ' · stopping')
+    : sc.on ? `On: ${each}. Next scan around ${clock(sc.next_at)}.`
+    : `Stopped. Go reviews ${each}.`;
+  const banner = $('scan-banner');
+  banner.hidden = sc.on && !sc.unavailable;
+  if (!banner.hidden) {
+    const go = el('button', { type: 'button', className: 'run-now', textContent: 'Go', disabled: Boolean(sc.unavailable),
+                              title: $('scan-go').title });
+    go.onclick = () => turnScanner(true);
+    banner.replaceChildren(el('b', { textContent: '✗ Source review is not running' }), ' ',
+      sc.unavailable ? `It cannot run: ${sc.unavailable}` : 'It was stopped, so no endpoint code is being reviewed.',
+      ...(sc.unavailable ? [] : [' ', go]));
+  }
+  autoOpen($('scan-more'), sc.running || Boolean(current && current.status === 'failed'));
+  $('scan-runs').replaceChildren(...(sc.scans.length ? sc.scans.map((r) => el('li', {}, [
+    `#${r.id} ${dayClock(r.started_at)} · ${r.status}` + (r.model ? ` · ${r.model}` : ''),
+    ...(r.error || r.result ? [el('br'), r.error || r.result] : []),
+    ...(r.reviewed.length ? [el('span', { className: 'tpl n units', textContent:
+      'Recorded, not read again until changed:\n' + r.reviewed.map((e) => `${e.operation_id} at ${e.git_commit.slice(0, 12)}\n`
+        + Object.entries(e.units).map(([unit, mark]) => `  ${unit.split('/').pop()}${mark.startsWith('code:') && !unit.includes('#') ? ' (this endpoint only)' : ''}  ${mark.replace('code:', '').slice(0, 12)}`)
+          .join('\n')).join('\n') })] : []),
+  ])) : [el('li', { className: 'n', textContent: 'None yet.' })]));
+}
+
+async function turnScanner(on) {
+  $('scan-go').disabled = $('scan-stop').disabled = true;
+  try {
+    const response = await fetch('/api/source/scanner', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                          body: JSON.stringify({ on }) });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || response.statusText);
+  } catch (e) {
+    $('scan-state').textContent = `Could not ${on ? 'start' : 'stop'}: ${e.message}`;
+  }
+  sourceScanning = true;  // look again soon: a scan starts within seconds of Go
+  loadSource();
+}
+$('scan-go').addEventListener('click', () => turnScanner(true));
+$('scan-stop').addEventListener('click', () => turnScanner(false));
+loadSource();
+
+(async () => {
+  try {
+    state.instances = await api('/api/instances');
+  } catch (e) {
+    $('watching').textContent = `Could not load: ${e.message}`;
+    return;
+  }
+  const wanted = decodeURIComponent(location.hash.slice(1));
+  openInstance((state.instances.find((i) => i.name === wanted) || state.instances[0]).name);
+})();
+
+// Dark or light, overriding the system's choice; remembered in this browser only
+function isDark() {
+  const t = document.documentElement.dataset.theme;
+  return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+}
+function renderTheme() { $('theme').textContent = isDark() ? 'Light mode' : 'Dark mode'; }
+$('theme').addEventListener('click', () => {
+  const t = isDark() ? 'light' : 'dark';
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem('sentinel-theme', t); } catch {}
+  renderTheme();
+});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderTheme);
+renderTheme();
+
+$('claude-check').addEventListener('click', async () => {
+  claudeChecking = true;
+  $('claude-dot').className = 'dot live';
+  $('claude-state').textContent = 'Claude Code: asking it a question…';
+  $('claude-check').disabled = true;
+  try {
+    await api('/api/claude-check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    claudeChecking = false;
+    loadAnalysis();
+  } catch (e) {
+    claudeChecking = false;
+    $('claude-dot').className = 'dot warn';
+    $('claude-state').textContent = `Could not check Claude Code: ${e.message}`;
+    $('claude-check').disabled = false;
+  }
+});
+
+$('run-now').addEventListener('click', async () => {
+  $('run-now').disabled = true;
+  try {
+    await api('/api/analysis/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    loadAnalysis();
+  } catch (e) {
+    $('n-when').textContent = `Could not start: ${e.message}`;
+    $('run-now').disabled = false;
+  }
+});
+</script>
+</body>
+</html>
