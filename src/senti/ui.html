@@ -326,6 +326,8 @@ textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--line-strong)
 .runs li { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
 .runs .why { color: var(--muted); overflow-wrap: anywhere; }
 .result { white-space: pre-line; font-size: 14px; border-left: 3px solid var(--accent); padding: 4px 0 4px 12px; margin: 0 0 16px; }
+footer.from { margin: 0 auto; padding: 0 16px 32px; color: var(--muted); font-size: 13px; text-align: center; }
+footer.from a { color: inherit; }
 </style>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg width='24' height='28' role='img' aria-label='Senti' viewBox='0 0 96 110' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2349B5D2'%3E%3Cg transform='rotate(25 48 21)'%3E%3Crect x='46' y='9' width='4' height='12'/%3E%3Ccircle cx='48' cy='7' r='6'/%3E%3C/g%3E%3Cpath fill-rule='evenodd' d='M48 19.5a44.5 44.5 0 1 0 0.01 0Zm0 5a39.5 39.5 0 1 1 -0.01 0Z'/%3E%3Cpath fill-rule='evenodd' d='M27 62a21 21 0 1 0 42 0a21 21 0 1 0 -42 0ZM43.5 58a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0Z'/%3E%3Ccircle cx='49.5' cy='54.5' r='3'/%3E%3C/g%3E%3C/svg%3E">
 </head>
@@ -564,6 +566,7 @@ textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--line-strong)
     </details>
   </section>
 </main>
+<footer class="from">Senti from <a href="https://www.tesobe.com">TESOBE</a> · <a href="https://github.com/TESOBE/Senti">Senti on GitHub</a></footer>
 <script>
 // Everything shown comes from sentinel.db, partly derived from OBP-API logs: set as text, never as HTML.
 // In the order a finding moves through them, as on a kanban board

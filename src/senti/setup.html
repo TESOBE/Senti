@@ -58,6 +58,8 @@ button { font: 14px var(--sans); min-height: 32px; padding: 0 12px; border: 1px 
   background: var(--surface); color: var(--ink); cursor: pointer; }
 button:disabled { opacity: 0.55; cursor: default; }
 main, .bar { max-width: 1000px; }
+footer.from { margin: 0 auto; padding: 0 16px 32px; color: var(--muted); font-size: 13px; text-align: center; }
+footer.from a { color: inherit; }
 </style>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg width='24' height='28' role='img' aria-label='Senti' viewBox='0 0 96 110' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2349B5D2'%3E%3Cg transform='rotate(25 48 21)'%3E%3Crect x='46' y='9' width='4' height='12'/%3E%3Ccircle cx='48' cy='7' r='6'/%3E%3C/g%3E%3Cpath fill-rule='evenodd' d='M48 19.5a44.5 44.5 0 1 0 0.01 0Zm0 5a39.5 39.5 0 1 1 -0.01 0Z'/%3E%3Cpath fill-rule='evenodd' d='M27 62a21 21 0 1 0 42 0a21 21 0 1 0 -42 0ZM43.5 58a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0Z'/%3E%3Ccircle cx='49.5' cy='54.5' r='3'/%3E%3C/g%3E%3C/svg%3E">
 </head>
@@ -93,6 +95,7 @@ main, .bar { max-width: 1000px; }
 <p class="sub">Each instance is one running copy of a service, in one environment. Senti signs in as a Platform App with the OIDC client in the setting named here.</p>
 <div id="instances"></div>
 </main>
+<footer class="from">Senti from <a href="https://www.tesobe.com">TESOBE</a> · <a href="https://github.com/TESOBE/Senti">Senti on GitHub</a></footer>
 <script>
 // Everything shown is set as text, never as HTML: problems may quote what a service answered
 const $ = (id) => document.getElementById(id);
