@@ -14,3 +14,6 @@ work/*
 source-review/
 digests/*
 !digests/.gitkeep
+
+# Backups of .env, which hold secrets
+.env.bak*

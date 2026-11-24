@@ -22,7 +22,7 @@ from importlib.resources import files
 
 import httpx
 
-from . import build, classes, fixer, history, preferences, recheck, replies, setup_page, sonar
+from . import build, classes, fixer, history, preferences, probes, recheck, replies, setup_page, sonar
 from .analyst import Analyst, check_claude, decide, unavailable_reason
 from .config import Config, current_setup
 from .health import health
@@ -373,6 +373,10 @@ def make_handler(configs: list[Config], allowed_hosts: set[str], analysts: dict[
                 store.close()
 
         def do_GET(self):
+            # The probes come before the Host check: a Kubernetes probe or a monitor names the pod's address, not one
+            # the page is served at. They read nothing but check results, so they are safe to answer to anyone.
+            if probe := probes.answer(urlsplit(self.path).path, self.headers.get("Accept"), configs):
+                return self._send(*probe)
             if not self._trusted():
                 return self._json(HTTPStatus.FORBIDDEN, {"error": "Unexpected Host or Origin"})
             path = urlsplit(self.path).path

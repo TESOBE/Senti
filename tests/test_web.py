@@ -353,3 +353,36 @@ def test_the_help_page_shows_no_glossary_item_without_obp_api(config):
         assert json.loads(request(port, "GET", "/api/help")[1]) == {"none": True}
     finally:
         stop()
+
+
+def test_alive_and_health_answer_whatever_the_host(server):
+    pod_address = {"Host": "10.0.0.5:8765"}  # what a Kubernetes probe sends: not a host the page is served at
+    status, body = request(server, "GET", "/alive", headers=pod_address)
+    assert status == 200 and body == b"true"
+    status, body = request(server, "GET", "/health", headers=pod_address)
+    assert status == 200 and json.loads(body) == {"status": "ok"}
+
+
+def test_status_checks_the_databases_and_answers_json_when_asked(server, config):
+    status, body = request(server, "GET", "/status", headers={"Accept": "application/json"})
+    data = json.loads(body)
+    assert status == 200 and data["status"] == "ok"
+    assert data["checks"] == {"databases": {config.name: "ok"}, "source_database": "ok"}
+    status, page = request(server, "GET", "/status", headers={"Accept": "text/html"})
+    assert status == 200 and b"<title>Senti - Status</title>" in page
+
+
+def test_status_is_503_when_a_database_cannot_be_read(config, tmp_path):
+    missing = replace(config, db_path=str(tmp_path / "missing" / "sentinel.db"))
+    allowed = set()
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler([missing], allowed))
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        status, body = request(httpd.server_address[1], "GET", "/status", headers={"Accept": "application/json"})
+        data = json.loads(body)
+        assert status == 503 and data["status"] == "degraded"
+        assert data["checks"]["databases"] == {config.name: "fail"}
+    finally:
+        httpd.shutdown()
+        httpd.server_close()

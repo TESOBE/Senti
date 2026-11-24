@@ -757,8 +757,8 @@ function render() {
     b.onclick = () => { state.tab = id; state.selected = null; setStatus(''); $('fix-rated-state').textContent = ''; render(); };
     return b;
   };
-  // Empty tabs are left out, except To review and the one open
-  const shown = (tabs) => tabs.filter(([id]) => id === 'review' || id === state.tab || count(id));
+  // Empty tabs are left out, except To review, To commit (a tab that comes and goes reads like a menu item disappearing) and the one open
+  const shown = (tabs) => tabs.filter(([id]) => id === 'review' || id === 'commit' || id === state.tab || count(id));
   const rated = shown(RATED_TABS);
   $('tabs').replaceChildren(...shown(TABS).map(tab),
     ...(rated.length ? [el('span', { className: 'rated-label', textContent: 'Your ratings:' }), ...rated.map(tab)] : []));
