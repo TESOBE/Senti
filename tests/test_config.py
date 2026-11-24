@@ -94,3 +94,12 @@ def test_senti_will_not_run_outside_its_folder(monkeypatch, tmp_path):
     (tmp_path / "senti.toml").write_text("")
     monkeypatch.chdir(tmp_path)
     assert remember() is None and __import__("os").environ["SENTI_HOME"] == str(tmp_path.resolve())
+
+
+def test_telemetry_is_kept_48_hours_unless_told_otherwise(config, monkeypatch):
+    monkeypatch.delenv("SENTINEL_INSTANCES", raising=False)
+    [c] = Config.all_from_env()
+    assert c.telemetry_retention_hours == 48 and c.retention_days == 14
+    monkeypatch.setenv("SENTINEL_TELEMETRY_RETENTION_HOURS", "24")
+    [c] = Config.all_from_env()
+    assert c.telemetry_retention_hours == 24
