@@ -158,10 +158,10 @@ def call(port, method, path, body=None, headers=None):
     return response.status, data
 
 
-def test_the_commit_page_stages_and_commits_a_group(server, repo):
+def test_the_changes_page_stages_and_commits_a_group(server, repo):
     port, service = server
-    status, page = call(port, "GET", "/commit")
-    assert status == 200 and b"<title>Senti Commit</title>" in page
+    status, page = call(port, "GET", "/changes")
+    assert status == 200 and b"<title>Senti Changes</title>" in page
     status, data = call(port, "GET", "/api/commits")
     assert status == 200 and json.loads(data)[0]["changed"] == 5
     q = f"?service={service}"
@@ -182,3 +182,49 @@ def test_the_commit_page_refuses_another_origin(server):
     status, _ = call(port, "POST", f"/api/commits/stage?service={service}", {"files": ["token.py"]},
                      headers={"Origin": "http://evil.example"})
     assert status == 403
+
+
+def test_a_files_changes_are_shown_but_not_a_secrets_or_an_unchanged_files(checkout, repo):
+    changed = commits.file_diff(checkout.source, "app.py")
+    assert changed["state"] == "changed" and "-print('one')" in changed["diff"] and "+print('two')" in changed["diff"]
+    new = commits.file_diff(checkout.source, "token.py")
+    assert new["state"] == "new" and new["diff"] == "@@ new file, 1 lines @@\n+def token(): pass"
+    assert "-gone" in commits.file_diff(checkout.source, "old.py")["diff"]
+    secret = commits.file_diff(checkout.source, ".env")
+    assert secret["diff"] is None and "secrets" in secret["note"]
+    (repo / "picture.bin").write_bytes(b"\0\1\2")
+    assert commits.file_diff(checkout.source, "picture.bin")["note"] == "A binary file, not shown."
+    with pytest.raises(ValueError, match="not changed"):
+        commits.file_diff(checkout.source, "../../etc/passwd")
+
+
+def test_the_commit_page_shows_a_files_changes(server):
+    port, service = server
+    status, data = call(port, "GET", f"/api/commits/diff?service={service}&path=app.py")
+    assert status == 200 and "+print('two')" in json.loads(data)["diff"]
+    status, data = call(port, "GET", f"/api/commits/diff?service={service}&path=.env")
+    assert status == 200 and "do-not-send" not in data.decode()
+    assert call(port, "GET", f"/api/commits/diff?service={service}&path=nothing.py")[0] == 404
+    assert call(port, "GET", f"/api/commits/diff?service={service}")[0] == 404
+
+
+
+def test_the_page_gets_the_editor_link_zed_unless_one_is_set(config, checkout, monkeypatch):
+    assert config.editor_url == "zed://file{path}" and commits.state(checkout)["editor_url"] == "zed://file{path}"
+    monkeypatch.setenv("SENTINEL_EDITOR_URL", "vscode://file{path}")
+    assert type(config).from_env().editor_url == "vscode://file{path}"
+
+
+def test_a_folder_git_will_not_work_in_says_why(tmp_path, monkeypatch):
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    assert commits.git_problem(str(plain)) == f"{plain} is not a git checkout"
+    assert commits.git_problem(str(tmp_path / "missing")).endswith("is not a folder")
+
+    class Refused:
+        returncode, stdout = 128, ""
+        stderr = "fatal: detected dubious ownership in repository at '/x'"
+
+    monkeypatch.setattr(commits, "run_git", lambda *args, **kwargs: Refused())
+    said = commits.git_problem(str(tmp_path))
+    assert "another user" in said and f"git config --global --add safe.directory {tmp_path}" in said

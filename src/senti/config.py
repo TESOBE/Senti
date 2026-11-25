@@ -205,6 +205,7 @@ class Config:
     analyse_budget_usd: float
     analyse_timeout_minutes: int
     claude_command: str
+    editor_url: str  # the link the Changes page opens a checkout or file with, in the person's editor: {path} is its full path
 
     scan_minutes: int  # while the source scanner is on (Go on the page), a scan this often
     scan_budget_usd: float  # most one scan may spend
@@ -354,6 +355,7 @@ class Config:
             analyse_budget_usd=float(env("SENTINEL_ANALYSE_BUDGET_USD", "10")),
             analyse_timeout_minutes=int(env("SENTINEL_ANALYSE_TIMEOUT_MINUTES", "30")),
             claude_command=env("SENTINEL_CLAUDE_COMMAND", "claude"),
+            editor_url=env("SENTINEL_EDITOR_URL", "zed://file{path}"),
             scan_minutes=int(env("SENTINEL_SCAN_MINUTES", "10")),
             scan_budget_usd=float(env("SENTINEL_SCAN_BUDGET_USD", "3")),
             scan_endpoints=int(env("SENTINEL_SCAN_ENDPOINTS", "2")),

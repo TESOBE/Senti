@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Senti Commit</title>
+<title>Senti Changes</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script>
@@ -70,6 +70,27 @@ label.field { display: block; font-size: 13px; color: var(--muted); margin: 8px 
 .said.error { color: #B3261E; }
 .item.staged { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .services a { font-weight: 600; }
+/* A file's changes, in a panel beside the groups: the page widens while it is open */
+body.with-diff main, body.with-diff .bar { max-width: 1680px; }
+#layout { display: block; }
+body.with-diff #layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 24px; align-items: start; }
+#diff { position: sticky; top: 12px; max-height: calc(100vh - 24px); display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 6px; margin-top: 24px; }
+#diff .head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+#diff .head strong { font: 600 13px var(--mono); overflow-wrap: anywhere; flex: 1; }
+#diff pre { margin: 0; border: 0; border-radius: 0 0 6px 6px; overflow: auto; flex: 1; padding: 8px 0; background: none; }
+#diff pre span { display: block; padding: 0 12px; white-space: pre; min-height: 1.4em; }
+#diff .add { background: rgba(46, 160, 67, 0.15); }
+#diff .del { background: rgba(248, 81, 73, 0.15); }
+#diff .hunk { color: var(--accent); background: var(--bg); }
+#diff .meta { color: var(--muted); }
+#diff .note { padding: 12px; margin: 0; color: var(--muted); }
+button.file { border: 0; background: none; padding: 0; min-height: 0; font: 13px var(--mono); color: var(--accent);
+  text-decoration: underline; text-align: start; overflow-wrap: anywhere; cursor: pointer; }
+a.open { font-size: 12px; border: 1px solid var(--line); border-radius: 6px; padding: 0 6px; text-decoration: none; white-space: nowrap; }
+a.open.folder { font-size: 14px; display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; color: var(--ink); }
+button.file[aria-pressed="true"] { font-weight: 600; text-decoration: none; color: var(--ink); }
+@media (max-width: 900px) { body.with-diff #layout { display: block; } #diff { position: static; max-height: 70vh; } }
 </style>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg width='24' height='28' role='img' aria-label='Senti' viewBox='0 0 96 110' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2349B5D2'%3E%3Cg transform='rotate(25 48 21)'%3E%3Crect x='46' y='9' width='4' height='12'/%3E%3Ccircle cx='48' cy='7' r='6'/%3E%3C/g%3E%3Cpath fill-rule='evenodd' d='M48 19.5a44.5 44.5 0 1 0 0.01 0Zm0 5a39.5 39.5 0 1 1 -0.01 0Z'/%3E%3Cpath fill-rule='evenodd' d='M27 62a21 21 0 1 0 42 0a21 21 0 1 0 -42 0ZM43.5 58a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0Z'/%3E%3Ccircle cx='49.5' cy='54.5' r='3'/%3E%3C/g%3E%3C/svg%3E">
 </head>
@@ -78,14 +99,14 @@ label.field { display: block; font-size: 13px; color: var(--muted); margin: 8px 
   <div class="bar">
     <span class="brand"><svg width="24" height="28" role="img" aria-label="Senti" viewBox="0 0 96 110" xmlns="http://www.w3.org/2000/svg"><g fill="#49B5D2"><g transform="rotate(25 48 21)"><rect x="46" y="9" width="4" height="12"/><circle cx="48" cy="7" r="6"/></g><path fill-rule="evenodd" d="M48 19.5a44.5 44.5 0 1 0 0.01 0Zm0 5a39.5 39.5 0 1 1 -0.01 0Z"/><path fill-rule="evenodd" d="M27 62a21 21 0 1 0 42 0a21 21 0 1 0 -42 0ZM43.5 58a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0Z"/><circle cx="49.5" cy="54.5" r="3"/></g></svg><strong>Senti</strong></span>
     <a href="/">Back to the suggestions</a>
-    <a href="/commit">Commit</a>
+    <a href="/changes">Changes</a>
   </div>
 </header>
 <main>
-<h1 id="title">Commit changes</h1>
+<h1 id="title">Changes</h1>
 <p class="lead" id="lead">Loading…</p>
 <p class="said" id="said" role="status"></p>
-<div id="content"></div>
+<div id="layout"><div id="content"></div><aside id="diff" aria-label="Changes of the file" hidden></aside></div>
 </main>
 <footer class="from">Senti from <a href="https://www.tesobe.com">TESOBE</a> · <a href="https://github.com/TESOBE/Senti">Senti on GitHub</a></footer>
 <script>
@@ -97,6 +118,80 @@ const api = (action) => `/api/commits/${action}?service=${encodeURIComponent(ser
 let data = null;        // the state, as Senti last sent it
 let saveTimer = null;   // a pending save of the person's edits
 let polling = null;
+let shownPath = null;   // the file whose changes are in the panel
+
+// The editor link set in SENTINEL_EDITOR_URL ({path} is the full path), named by its scheme. The browser opens it, so the editor opens on the person's screen whoever Senti runs as.
+const EDITORS = { zed: 'Zed', vscode: 'VS Code', vscodium: 'VSCodium', cursor: 'Cursor', idea: 'IntelliJ IDEA', subl: 'Sublime Text' };
+const editorName = () => { const scheme = (data?.editor_url || '').split(':')[0]; return EDITORS[scheme] || scheme || 'the editor'; };
+
+function editorHref(fullPath) {
+  const template = data.editor_url;
+  // In a query (idea://open?file={path}) the path is one encoded value; in a path (zed://file{path}) only its parts are
+  const inQuery = template.indexOf('?') >= 0 && template.indexOf('?') < template.indexOf('{path}');
+  const encoded = inQuery ? encodeURIComponent(fullPath) : fullPath.split('/').map(encodeURIComponent).join('/');
+  return template.replace('{path}', encoded);
+}
+
+// A link that opens the checkout, or one of its files, in the editor; a deleted file opens the checkout
+function openLink(path, label) {
+  const deleted = path && byPath()[path]?.state === 'deleted';
+  const full = path && !deleted ? `${data.source}/${path}` : data.source;
+  return el('a', { className: path ? 'open' : 'open folder', href: editorHref(full), textContent: label || `Open in ${editorName()}`,
+    title: deleted ? `${path} is deleted: open the checkout in ${editorName()}` : `Open ${full} in ${editorName()}` });
+}
+
+// A file's name: pressing it shows its changes in the panel beside the groups
+function fileButton(path) {
+  const b = el('button', { type: 'button', className: 'file', textContent: path, title: 'Show its changes' });
+  b.setAttribute('aria-pressed', String(path === shownPath));
+  b.dataset.path = path;
+  b.addEventListener('click', () => (path === shownPath ? closeDiff() : showDiff(path)));
+  return b;
+}
+
+function closeDiff() {
+  shownPath = null;
+  $('diff').hidden = true;
+  document.body.classList.remove('with-diff');
+  markShown();
+}
+
+function markShown() {
+  document.querySelectorAll('button.file').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.path === shownPath)));
+}
+
+function diffLines(text) {
+  return text.split('\n').map((line) => el('span', { textContent: line, className:
+    line.startsWith('@@') ? 'hunk'
+    : /^(diff --git|index |--- |\+\+\+ |new file mode|deleted file mode|similarity index|rename (from|to) |old mode|new mode)/.test(line) ? 'meta'
+    : line.startsWith('+') ? 'add' : line.startsWith('-') ? 'del' : '' }));
+}
+
+async function showDiff(path) {
+  shownPath = path;
+  markShown();
+  document.body.classList.add('with-diff');
+  const close = el('button', { type: 'button', textContent: 'Close', title: 'Close (Esc)' });
+  close.addEventListener('click', closeDiff);
+  const panel = $('diff');
+  panel.hidden = false;
+  panel.replaceChildren(el('div', { className: 'head' }, [el('strong', { textContent: path }), close]), el('p', { className: 'note', textContent: 'Loading…' }));
+  try {
+    const r = await fetch(`/api/commits/diff?service=${encodeURIComponent(service)}&path=${encodeURIComponent(path)}`);
+    const d = await r.json();
+    if (shownPath !== path) return;  // another file was pressed meanwhile
+    if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+    const title = `${d.path} · ${d.state}${d.from ? ', from ' + d.from : ''}`;
+    panel.replaceChildren(el('div', { className: 'head' }, [el('strong', { textContent: title }),
+      ...(data.editor_url ? [openLink(path, `Open in ${editorName()}`)] : []), close]),
+      d.diff ? el('pre', {}, diffLines(d.diff)) : el('p', { className: 'note', textContent: d.note || 'Nothing to show.' }));
+  } catch (e) {
+    if (shownPath === path) panel.replaceChildren(el('div', { className: 'head' }, [el('strong', { textContent: path }), close]),
+      el('p', { className: 'note', textContent: `Could not show its changes: ${e.message}` }));
+  }
+}
+
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && shownPath) closeDiff(); });
 
 function say(text, error = false) { $('said').textContent = text; $('said').className = error ? 'said error' : 'said'; }
 
@@ -114,9 +209,9 @@ async function showServices() {
     ? 'Pick a service to group its uncommitted changes into commits. Services that share a checkout share one page.'
     : 'No service has a checkout set. Set its source in senti.toml.';
   $('content').replaceChildren(el('ul', { className: 'services' }, list.map((c) => el('li', {}, [
-    el('a', { href: '/commit?service=' + encodeURIComponent(c.services[0]), textContent: c.services.join(', ') }),
+    el('a', { href: '/changes?service=' + encodeURIComponent(c.services[0]), textContent: c.services.join(', ') }),
     ` · ${c.source} · `,
-    c.changed === null ? 'not a git checkout' : c.changed ? `${c.changed} changed file${c.changed === 1 ? '' : 's'}` : 'nothing to commit',
+    c.changed === null ? (c.problem || 'not a git checkout') : c.changed ? `${c.changed} changed file${c.changed === 1 ? '' : 's'}` : 'nothing to commit',
   ]))));
 }
 
@@ -193,14 +288,14 @@ function groupCard(g, number) {
     el('label', { className: 'field', htmlFor: body.id, textContent: 'Body: one line per paragraph, a blank line between paragraphs' }), body,
     el('label', { className: 'field', textContent: g.files.length ? `Files (${g.files.length})` : 'No files left in this group' }),
     el('ul', { className: 'files' }, g.files.map((f) => el('li', {}, [
-      el('span', { textContent: f }), ...(files[f] ? fileTags(files[f]) : []), moveSelect(f, g.id)]))),
+      fileButton(f), ...(files[f] ? fileTags(files[f]) : []), openLink(f, 'Open'), moveSelect(f, g.id)]))),
     el('div', { className: 'row' }, [stageButton, commitButton, removeButton]),
   ]);
 }
 
 function render() {
   const h = data.head || {};
-  $('title').textContent = `Commit changes in ${data.source.split('/').pop()}`;
+  $('title').textContent = `Changes in ${data.source.split('/').pop()}`;
   $('lead').textContent = `${data.source} · ${data.services.join(', ')}` +
     (h.branch ? ` · on ${h.branch}` : '') + (h.sha ? ` at ${h.sha} (${h.subject})` : ' · no commits yet');
   if (data.error) return $('content').replaceChildren(el('p', { textContent: data.error }));
@@ -220,12 +315,11 @@ function render() {
   $('content').replaceChildren(
     el('p', { textContent: intro }),
     ...(data.suggest_error ? [el('p', { className: 'said error', textContent: `Grouping failed: ${data.suggest_error}` })] : []),
-    el('div', { className: 'row' }, [suggestButton,
-      ...(data.cost_usd != null && data.groups.length ? [el('span', { className: 'said', textContent: `Grouped for $${data.cost_usd.toFixed(2)}` })] : [])]),
+    el('div', { className: 'row' }, [suggestButton, ...(data.editor_url ? [openLink(null)] : [])]),
     ...data.groups.map((g, i) => groupCard(g, i + 1)),
     ...(data.not_grouped.length ? [el('h2', { textContent: `Not in a group (${data.not_grouped.length})` }),
       el('ul', { className: 'files' }, data.not_grouped.map((p) => el('li', {}, [
-        el('span', { textContent: p }), ...(files[p] ? fileTags(files[p]) : []), moveSelect(p, null)])))] : []),
+        fileButton(p), ...(files[p] ? fileTags(files[p]) : []), openLink(p, 'Open'), moveSelect(p, null)])))] : []),
     ...(otherStaged.length && !data.groups.some((g) => g.staged) ? [el('p', { className: 'said',
       textContent: `Staged now, not by a group here: ${otherStaged.join(', ')}. Stage a group to replace it.` })] : []),
   );
@@ -239,6 +333,7 @@ async function load() {
   data.staged = data.staged || [];
   data.not_grouped = data.not_grouped || [];
   render();
+  if (shownPath) (data.changes || []).some((c) => c.path === shownPath) ? showDiff(shownPath) : closeDiff();
   clearTimeout(polling);
   if (data.suggesting) polling = setTimeout(load, 3000);
 }

@@ -1,12 +1,8 @@
-"""Commit changes: the Commit page (`/commit`) groups the uncommitted changes in a service's checkout into commits.
+"""Commit changes: the Changes page (`/changes`) groups the uncommitted changes in a service's checkout into commits.
 
-Claude reads the changes (their diff and the start of each new file) and suggests groups, each with a commit message
-and its files. Claude has no tools here: it only answers with the groups, and Senti itself runs git. The person edits
-each message, moves files between groups, then stages a group and commits it, in whatever order they like.
+Claude reads the changes (their diff and the start of each new file) and suggests groups, each with a commit message and its files. Claude has no tools here: it only answers with the groups, and Senti itself runs git. The person edits each message, moves files between groups, then stages a group and commits it, in whatever order they like.
 
-This changes the person's own checkout, not Senti's worktree, so only paths that `git status` lists are staged, never
-a path just because Claude named it, and files that usually hold secrets are never sent to Claude or staged.
-Services that share a checkout (the OBP-Frontend apps) share one page and one set of groups.
+This changes the person's own checkout, not Senti's worktree, so only paths that `git status` lists are staged, never a path just because Claude named it, and files that usually hold secrets are never sent to Claude or staged. Services that share a checkout (the OBP-Frontend apps) share one page and one set of groups.
 """
 
 import hashlib
@@ -86,13 +82,27 @@ def checkout_of(configs: list[Config], service: str) -> Checkout | None:
     return next((c for c in checkouts(configs) if service in c.services), None)
 
 
+def git_problem(source: str) -> str | None:
+    """Why git cannot work in this checkout, in git's words, with what to do for the commonest reason; None if it can."""
+    if not Path(source).is_dir():
+        return f"{source} is not a folder"
+    out = run_git(source, "rev-parse", "--is-inside-work-tree")
+    if out.returncode == 0:
+        return None
+    said = out.stderr.strip()
+    if "dubious ownership" in said:
+        return (f"git refuses to work in {source}, because it belongs to another user than the one Senti runs as. Trust it for Senti's user: git config --global --add safe.directory {source}")
+    if "not a git repository" in said:
+        return f"{source} is not a git checkout"
+    return f"git cannot work in {source}: {said.splitlines()[0] if said else 'it gave no reason'}"
+
+
 def is_git(source: str) -> bool:
-    return Path(source).is_dir() and run_git(source, "rev-parse", "--is-inside-work-tree").returncode == 0
+    return git_problem(source) is None
 
 
 def changes(source: str) -> list[dict]:
-    """What `git status` lists: each changed, deleted, renamed or new file, with whether it is staged. A rename's old
-    path is in `from`. Ignored files are not listed."""
+    """What `git status` lists: each changed, deleted, renamed or new file, with whether it is staged. A rename's old path is in `from`. Ignored files are not listed."""
     out = run_git(source, "status", "--porcelain=v1", "-z", "--untracked-files=all")
     if out.returncode != 0:
         raise ValueError(f"git status: {out.stderr.strip()[:300]}")
@@ -190,11 +200,10 @@ def save_groups(source: str, groups: list) -> list[dict]:
 
 
 def state(checkout: Checkout) -> dict:
-    """Everything the page shows for a checkout: its changes, what is staged, and the groups as they stand now. A file
-    committed or undone since is left out of its group; a changed file in no group is listed as not grouped."""
+    """Everything the page shows for a checkout: its changes, what is staged, and the groups as they stand now. A file committed or undone since is left out of its group; a changed file in no group is listed as not grouped."""
     source = checkout.source
-    if not is_git(source):
-        return {"source": source, "services": checkout.services, "error": f"{source} is not a git checkout"}
+    if problem := git_problem(source):
+        return {"source": source, "services": checkout.services, "error": problem}
     listed = changes(source)
     by_path = {c["path"]: c for c in listed}
     staged = staged_paths(source)
@@ -207,7 +216,7 @@ def state(checkout: Checkout) -> dict:
     grouped = {f for g in groups for f in g["files"]}
     running = _running.get(source, {})
     return {
-        "source": source, "services": checkout.services, "head": head(source),
+        "source": source, "services": checkout.services, "head": head(source), "editor_url": checkout.config.editor_url,
         "changes": listed, "staged": sorted(staged),
         "groups": groups, "not_grouped": [c["path"] for c in listed if c["path"] not in grouped],
         "suggested_at": saved.get("suggested_at"), "suggested_for": saved.get("suggested_for"),
@@ -260,8 +269,7 @@ def message_of(subject: str, body: str) -> str:
 
 
 def commit(checkout: Checkout, group_id: str, subject: str, body: str) -> dict:
-    """Commit the group, when the person presses Commit: only if exactly its files are staged, so nothing else goes
-    in by mistake. The group is then done and leaves the page; the others stay as they are."""
+    """Commit the group, when the person presses Commit: only if exactly its files are staged, so nothing else goes in by mistake. The group is then done and leaves the page; the others stay as they are."""
     if not isinstance(subject, str) or not isinstance(body, str):
         raise ValueError("The subject and body must be text")
     message = message_of(subject, body)
@@ -328,9 +336,38 @@ def _new_file(source: str, path: str) -> str:
     return _cut(data.decode("utf-8", "replace"), FILE_DIFF_MAX_CHARS)
 
 
+SHOWN_DIFF_MAX_CHARS = 400_000  # one file's changes on the page
+
+
+def file_diff(source: str, path: str) -> dict:
+    """One changed file's changes, for the page: its diff against the last commit (staged and not), or all of a new file's lines as added. Only a file `git status` lists; a file that usually holds secrets is not shown."""
+    if not isinstance(path, str):
+        raise ValueError("Say which file")
+    change = next((c for c in changes(source) if c["path"] == path), None)
+    if change is None:
+        raise ValueError(f"{path} is not changed in the checkout now. Reload the page.")
+    shown = {"path": path, "state": change["state"], "from": change.get("from")}
+    if change["secret"]:
+        return {**shown, "diff": None, "note": "This file usually holds secrets, so Senti does not show it."}
+    if change["index"] == "?":
+        text = _new_file(source, path)
+        if text.startswith("(") and text.endswith(")") and "\n" not in text:  # binary, large or unreadable
+            return {**shown, "diff": None, "note": text.strip("()").capitalize() + "."}
+        lines = text.split("\n")
+        if lines and lines[-1] == "":
+            lines.pop()
+        return {**shown, "diff": f"@@ new file, {len(lines)} lines @@\n" + "\n".join("+" + l for l in lines)}
+    has_head = run_git(source, "rev-parse", "--verify", "-q", "HEAD").returncode == 0
+    paths = [path, *([change["from"]] if change.get("from") else [])]
+    out = run_git(source, "diff", "--no-color", "--no-ext-diff", "-M", *(["HEAD"] if has_head else ["--cached"]), "--", *paths)
+    if out.returncode != 0:
+        raise ValueError(f"git diff: {out.stderr.strip()[:300]}")
+    return {**shown, "diff": _cut(out.stdout, SHOWN_DIFF_MAX_CHARS) or None,
+            "note": None if out.stdout else "No difference in its text (only its mode, or a binary file)."}
+
+
 def what_changed(source: str, listed: list[dict]) -> str:
-    """The changes as Claude is shown them: each file's diff against the last commit, or the start of a new file.
-    Files that usually hold secrets are only named."""
+    """The changes as Claude is shown them: each file's diff against the last commit, or the start of a new file. Files that usually hold secrets are only named."""
     has_head = run_git(source, "rev-parse", "--verify", "-q", "HEAD").returncode == 0
     parts, total = [], 0
     for c in listed:

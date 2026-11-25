@@ -390,10 +390,18 @@ def make_handler(configs: list[Config], allowed_hosts: set[str], analysts: dict[
                 return self._send(HTTPStatus.OK, page("fixed.html"), "text/html; charset=utf-8")
             if path == "/setup":
                 return self._send(HTTPStatus.OK, page("setup.html"), "text/html; charset=utf-8")
-            if path == "/commit":
-                return self._send(HTTPStatus.OK, page("commit.html"), "text/html; charset=utf-8")
+            if path == "/changes":
+                return self._send(HTTPStatus.OK, page("changes.html"), "text/html; charset=utf-8")
             if path == "/api/commits":  # the checkouts to commit in, and how many files each has changed
                 return self._json(HTTPStatus.OK, commit_checkouts(configs))
+            if path == "/api/commits/diff":  # one changed file's changes, for the panel beside the groups
+                if checkout := self._checkout():
+                    paths = parse_qs(urlsplit(self.path).query).get("path")
+                    try:
+                        self._json(HTTPStatus.OK, commits.file_diff(checkout.source, paths[0] if paths else None))
+                    except ValueError as e:
+                        self._json(HTTPStatus.NOT_FOUND, {"error": str(e)})
+                return
             if path == "/api/commits/state":
                 if checkout := self._checkout():
                     try:
@@ -625,7 +633,7 @@ def make_handler(configs: list[Config], allowed_hosts: set[str], analysts: dict[
             return checkout
 
         def _commits(self, action: str):
-            """Commit page actions: suggest groups, save the person's edit of them, stage a group, commit it."""
+            """Changes page actions: suggest groups, save the person's edit of them, stage a group, commit it."""
             checkout = self._checkout()
             if checkout is None:
                 return
@@ -728,14 +736,15 @@ def make_server(configs: list[Config], host: str, port: int, extra_hosts: tuple[
 
 
 def commit_checkouts(configs: list[Config]) -> list[dict]:
-    """The checkouts the Commit page can commit in: their services, and how many files are changed in each."""
+    """The checkouts the Changes page can commit in: their services, and how many files are changed in each."""
     out = []
     for checkout in commits.checkouts(configs):
+        problem = commits.git_problem(checkout.source)
         try:
-            changed = len(commits.changes(checkout.source)) if commits.is_git(checkout.source) else None
-        except ValueError:
-            changed = None
-        out.append({"source": checkout.source, "services": checkout.services, "changed": changed})
+            changed = None if problem else len(commits.changes(checkout.source))
+        except ValueError as e:
+            changed, problem = None, str(e)
+        out.append({"source": checkout.source, "services": checkout.services, "changed": changed, "problem": problem})
     return out
 
 
