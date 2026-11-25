@@ -45,6 +45,7 @@ perfectly good result.
 3. Pick the candidates that look most important: errors that are frequent, persistent (several
    buckets), new or rising, on important paths (authentication, authorisation, payments, personal data, and
    those the notes name), or endpoints and calls to other systems that are failing or have slowed down.
+   When the prompt gives the person's focus for the service, look into the candidates within it first.
    Use `uv run senti show <signature_id>` for raw samples.
 4. For each candidate, investigate the source: find where the message is logged
    (grep for its fixed words where the notes say the code is), follow the code path, and check recent
@@ -70,7 +71,8 @@ perfectly good result.
      "confidence": 0.5,
      "effort": 1,
      "trend": "new | rising | stable | falling",
-     "needs_id": false
+     "needs_id": false,
+     "in_focus": false
    }
    ```
 
@@ -78,6 +80,10 @@ perfectly good result.
      consent, collection...) that the attacker cannot list or see through the API, so must guess or obtain it
      elsewhere; false when it works without one, or the id is easy to come by (listed to them, in a response they
      can get, sequential). Such findings are fixed later: their priority is lowered.
+
+   - `in_focus`: when the prompt gives the person's focus for the service, true when the finding falls within
+     it, false when not; leave it out when there is no focus. Senti raises the priority of findings in focus by
+     itself: do not change `impact` or `confidence` for it.
 
    - `impact` 1–5: 5 = breaks important functionality or exposes data; 1 = cosmetic.
    - `confidence` 0–1: be honest. Below 0.5 if you did not find the code path.

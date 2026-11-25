@@ -75,6 +75,7 @@ checks, even where the logs show nothing wrong.
   impact 4 or more is never put later. The analyst also reads your reasons for dismissing findings, so it does not
   raise that kind of problem again. Only what you choose to do counts, not what you open or read; Rescan marking
   a finding fixed does not count either. The page says what it has learned above the tabs, with Forget to start again.
+- **Focus** (`focus.py`): each service has a Focus box at the right of its row at the top of the page, where you say in your own words what Senti should look at first. It is saved for every instance of the service. Every AI run on the service is told it (`context.py`), and on OBP-API the source review is too: the analyst looks into what it names first and marks each finding within it `in_focus`. A finding in focus has its priority multiplied by 1.5 (`FOCUS_WEIGHT`) and shows In your focus; its impact and confidence are still scored on their merits. Saving a new focus clears the marks, and the next analysis judges the findings again. `GET /api/focus` lists the focus of each service and `POST /api/focus` (`{"service": ..., "focus": ...}`) saves one.
 
 Towards a running OBP-API instance Senti is read-only: it does not change log levels or any other setting.
 It changes OBP-API's source only when you ask it to. When you press Fix this (or Fix all), Claude edits your

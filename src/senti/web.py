@@ -22,7 +22,7 @@ from importlib.resources import files
 
 import httpx
 
-from . import build, classes, fixer, history, preferences, probes, recheck, replies, setup_page, sonar
+from . import build, classes, fixer, focus, history, preferences, probes, recheck, replies, setup_page, sonar
 from .analyst import Analyst, check_claude, decide, unavailable_reason
 from .config import Config, current_setup
 from .health import health
@@ -396,6 +396,8 @@ def make_handler(configs: list[Config], allowed_hosts: set[str], analysts: dict[
                 environments = environment_order(configs)
                 return self._json(HTTPStatus.OK, [self._with_store(c, lambda s, c=c: instance_status(s, c, environments))
                                                   for c in configs])
+            if path == "/api/focus":  # what the person wants Senti to focus on, by service
+                return self._json(HTTPStatus.OK, {"focus": focus.all_of(configs), "max_length": focus.MAX_LENGTH})
             if path == "/api/preferences":  # learned from the responses on every instance of this one's kind
                 if config := self._instance():
                     self._json(HTTPStatus.OK, {**preferences.learn(configs, config.kind),
@@ -440,6 +442,8 @@ def make_handler(configs: list[Config], allowed_hosts: set[str], analysts: dict[
                 return self._turn_scanner()
             if path == CLAUDE_CHECK_PATH:
                 return self._check_claude()
+            if path == "/api/focus":
+                return self._save_focus()
             if path == "/api/preferences/forget":
                 if config := self._instance():
                     preferences.forget(configs, config.kind)
@@ -596,6 +600,23 @@ def make_handler(configs: list[Config], allowed_hosts: set[str], analysts: dict[
             if reason := fixer.unavailable_reason(config) or unavailable_reason(config, scheduled=False):
                 return self._json(HTTPStatus.OK, {"ok": True, "not_queued": reason})
             self._json(HTTPStatus.OK, {"ok": True, **fixer.queue(config, int(match.group(1)), first=True)})
+
+        def _save_focus(self):
+            length = int(self.headers.get("Content-Length") or 0)
+            if length > MAX_BODY_BYTES:
+                return self._json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "Too large"})
+            try:
+                body = json.loads(self.rfile.read(length) or b"{}")
+            except json.JSONDecodeError:
+                return self._json(HTTPStatus.BAD_REQUEST, {"error": "Invalid JSON"})
+            service, text = (body.get("service"), body.get("focus")) if isinstance(body, dict) else (None, None)
+            if not isinstance(service, str) or not isinstance(text, str):
+                return self._json(HTTPStatus.BAD_REQUEST, {"error": "Send the service and its focus as text."})
+            try:
+                saved = focus.save(configs, service, text)
+            except ValueError as e:
+                return self._json(HTTPStatus.BAD_REQUEST, {"error": str(e)})
+            self._json(HTTPStatus.OK, {"service": service, "focus": saved})
 
         def _turn_scanner(self):
             """Go ({"on": true}) or Stop ({"on": false}) for the source scanner."""

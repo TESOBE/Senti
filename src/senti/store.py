@@ -134,8 +134,10 @@ CREATE TABLE IF NOT EXISTS findings (
     reply_to      TEXT,                    -- that comment
     reply_status  TEXT,                    -- running | done | failed
     replied_at    INTEGER,
-    needs_id      INTEGER                  -- 1: an attacker must know an id of another's object they cannot list or
+    needs_id      INTEGER,                 -- 1: an attacker must know an id of another's object they cannot list or
                                            -- see; lowers the priority (NEEDS_ID_WEIGHT). NULL: not judged yet
+    in_focus      INTEGER                  -- 1: within the person's focus for the service (focus.py); raises the
+                                           -- priority (FOCUS_WEIGHT). NULL: not judged against the current focus
 );
 
 -- Fix this: everything Claude did for a finding's latest fix, tool results too (kind: thinking | note | tool |
@@ -224,10 +226,13 @@ def now() -> int:
 
 
 NEEDS_ID_WEIGHT = 0.3  # a problem only an attacker who knows or guesses someone else's id can use comes later
+FOCUS_WEIGHT = 1.5  # a problem within what the person asked Senti to focus on comes sooner
 
 
-def priority_of(impact: int, confidence: float, effort: int, trend: str, needs_id: bool = False) -> float:
-    return round(impact * confidence * TREND_WEIGHTS[trend] / effort * (NEEDS_ID_WEIGHT if needs_id else 1), 3)
+def priority_of(impact: int, confidence: float, effort: int, trend: str, needs_id: bool = False,
+                in_focus: bool = False) -> float:
+    return round(impact * confidence * TREND_WEIGHTS[trend] / effort * (NEEDS_ID_WEIGHT if needs_id else 1)
+                 * (FOCUS_WEIGHT if in_focus else 1), 3)
 
 
 class Store:
@@ -257,7 +262,7 @@ class Store:
                  "fix_at": "INTEGER", "fix_message": "TEXT", "fix_files": "TEXT", "fix_patch": "TEXT",
                  "introduced_commit": "TEXT", "introduced_when": "TEXT", "introduced_who": "TEXT",
                  "introduced_where": "TEXT", "bug_class": "TEXT",
-                 "needs_id": "INTEGER", "fix_tests": "INTEGER",
+                 "needs_id": "INTEGER", "fix_tests": "INTEGER", "in_focus": "INTEGER",
                  "reply": "TEXT", "reply_to": "TEXT", "reply_status": "TEXT", "replied_at": "INTEGER"}  # after the first databases were made
         for column, kind in added.items():
             if column not in have:
@@ -368,26 +373,28 @@ class Store:
         if not (1 <= impact <= 5 and 1 <= effort <= 5 and 0 <= confidence <= 1):
             raise ValueError("impact and effort must be 1..5, confidence 0..1")
         ts = now()
-        existing = self.db.execute("SELECT id, needs_id FROM findings WHERE key = ?", (f["key"],)).fetchone()
+        existing = self.db.execute("SELECT id, needs_id, in_focus FROM findings WHERE key = ?", (f["key"],)).fetchone()
         needs_id = f.get("needs_id")  # left as judged before when the finding does not say
         needs_id = int(bool(needs_id)) if needs_id is not None else existing["needs_id"] if existing else None
+        in_focus = f.get("in_focus")  # the same
+        in_focus = int(bool(in_focus)) if in_focus is not None else existing["in_focus"] if existing else None
         fields = (
             f["title"], f.get("summary"), f["category"], json.dumps(f.get("signature_ids", [])), f["evidence"], f["hypothesis"],
-            json.dumps(f.get("files", [])), f["suggested_fix"], impact, confidence, effort, trend, needs_id,
-            priority_of(impact, confidence, effort, trend, bool(needs_id)),
+            json.dumps(f.get("files", [])), f["suggested_fix"], impact, confidence, effort, trend, needs_id, in_focus,
+            priority_of(impact, confidence, effort, trend, bool(needs_id), bool(in_focus)),
         )
         if existing:
             self.db.execute(
                 """UPDATE findings SET updated_at = ?, title = ?, summary = ?, category = ?, signature_ids = ?, evidence = ?,
                    hypothesis = ?, files = ?, suggested_fix = ?, impact = ?, confidence = ?, effort = ?, trend = ?,
-                   needs_id = ?, priority = ? WHERE id = ?""",
+                   needs_id = ?, in_focus = ?, priority = ? WHERE id = ?""",
                 (ts, *fields, existing["id"]),
             )
             return existing["id"]
         cur = self.db.execute(
             """INSERT INTO findings (key, created_at, updated_at, title, summary, category, signature_ids, evidence,
-               hypothesis, files, suggested_fix, impact, confidence, effort, trend, needs_id, priority)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               hypothesis, files, suggested_fix, impact, confidence, effort, trend, needs_id, in_focus, priority)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (f["key"], ts, ts, *fields),
         )
         return cur.lastrowid
@@ -396,8 +403,15 @@ class Store:
         """Record whether using the problem needs a guessed id, and work its priority out again."""
         f = self.db.execute("SELECT * FROM findings WHERE id = ?", (finding_id,)).fetchone()
         self.db.execute("UPDATE findings SET needs_id = ?, priority = ? WHERE id = ?",
-                        (int(needs_id), priority_of(f["impact"], f["confidence"], f["effort"], f["trend"], needs_id),
-                         finding_id))
+                        (int(needs_id), priority_of(f["impact"], f["confidence"], f["effort"], f["trend"], needs_id,
+                                                    bool(f["in_focus"])), finding_id))
+
+    def clear_in_focus(self) -> None:
+        """Forget which findings were in focus (the focus changed), and work their priority out again."""
+        for f in self.db.execute("SELECT * FROM findings WHERE in_focus IS NOT NULL").fetchall():
+            self.db.execute("UPDATE findings SET in_focus = NULL, priority = ? WHERE id = ?",
+                            (priority_of(f["impact"], f["confidence"], f["effort"], f["trend"], bool(f["needs_id"])),
+                             f["id"]))
 
     def findings(self, statuses: tuple[str, ...] | None = None) -> list[sqlite3.Row]:
         if statuses:

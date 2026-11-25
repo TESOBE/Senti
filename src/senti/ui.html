@@ -76,6 +76,14 @@ details.more > summary { cursor: pointer; color: var(--muted); font-size: 14px; 
   cursor: pointer; }
 .fleet td button:hover { border-color: var(--line-strong); }
 .fleet td button[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); font-weight: 600; }
+/* Focus: the last column, what the person wants Senti to look at first for that service */
+.fleet td.focus { white-space: normal; padding-left: 8px; border-left: 1px solid var(--line); min-width: 280px; }
+.fleet td.focus .row { display: flex; align-items: flex-start; gap: 8px; }
+.fleet td.focus textarea { flex: 1; min-width: 260px; margin: 0; padding: 6px 8px; font-size: 13px; }
+.fleet td.focus .save { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; max-width: 160px;
+  font-size: 12px; color: var(--muted); }
+.fleet td.focus .save button { min-height: 32px; margin: 0; }
+.fleet td.focus .save .error { color: var(--bad); }
 .fleet .count { margin-left: 6px; padding: 0 6px; border-radius: 9px; background: var(--accent); color: var(--on-accent);
   font-size: 12px; font-weight: 600; }
 .host { max-width: 1280px; margin: 0 auto; padding: 12px 16px 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 32px; }
@@ -598,7 +606,7 @@ const STATUS = { suggested: 'Suggested to you', open: 'Not suggested yet', later
 const FIX_STATUS = { queued: 'Queued for fixing', running: 'Being fixed', staged: 'Fix staged', committed: 'Fix committed',
                      skipped: 'Not fixed: no change needed', failed: 'Fix failed', discarded: 'Fix discarded' };
 const CAT_COLOR = { bug: 'var(--danger)', reliability: 'var(--danger)', security: 'var(--danger)' };
-const state = { instance: null, instances: [], tab: 'review', selected: null, findings: [], overview: null, learned: null };
+const state = { instance: null, instances: [], tab: 'review', selected: null, findings: [], overview: null, learned: null, focus: {}, focusMax: 1000 };
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, children = []) => {
@@ -789,6 +797,7 @@ function render() {
       el('div', { className: 'meta' }, [TREND[f.trend] || f.trend, '·', statusLabel(f),
                                          ...(f.rating && !state.tab.startsWith('rated-') ? ['·', RATED_LABEL[f.rating]] : []),
                                          ...(f.needs_id ? ['·', 'Needs a guessed id'] : []),
+                                         ...(f.in_focus ? ['·', 'In your focus'] : []),
                                          ...(f.fix_tests === 0 && f.fix_status ? ['·', 'Tests not run'] : []),
                                          ...(f.fix_status ? ['·', FIX_STATUS[f.fix_status] || f.fix_status] : [])]
         .map((s) => el('span', { textContent: s }))),
@@ -1493,9 +1502,56 @@ function instanceButton(i, label) {
   return b;
 }
 
+// Focus: one box per service, kept across renders so the grid's refresh never loses what is being typed
+const focusCells = new Map();
+function focusCell(service) {
+  if (focusCells.has(service)) return focusCells.get(service);
+  const box = el('textarea', { rows: 2, maxLength: state.focusMax, spellcheck: true, value: state.focus[service] || '',
+    placeholder: 'What should Senti look at first?', ariaLabel: `Focus for ${service}` });
+  const note = el('span', {});
+  const save = el('button', { type: 'button', textContent: 'Save' });
+  const changed = () => { save.disabled = box.value.trim() === (state.focus[service] || ''); note.textContent = ''; };
+  box.oninput = changed;
+  save.onclick = async () => {
+    save.disabled = true;
+    note.className = '';
+    note.textContent = 'Saving…';
+    try {
+      const saved = await postFocus(service, box.value);
+      state.focus[service] = saved.focus;
+      box.value = saved.focus;
+      note.textContent = saved.focus ? 'Saved. The next analysis uses it.' : 'Saved: no focus.';
+    } catch (e) {
+      note.className = 'error';
+      note.textContent = `Not saved: ${e.message}`;
+      save.disabled = false;
+    }
+  };
+  const cell = el('td', { className: 'focus' }, [el('div', { className: 'row' }, [box, el('div', { className: 'save' }, [save, note])])]);
+  cell.refresh = () => { if (document.activeElement !== box && save.disabled) box.value = state.focus[service] || ''; changed(); };
+  changed();
+  focusCells.set(service, cell);
+  return cell;
+}
+
+async function postFocus(service, text) {
+  const response = await fetch('/api/focus', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                               body: JSON.stringify({ service, focus: text }) });
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error || response.statusText);
+  return body;
+}
+
+async function loadFocus() {
+  const r = await api('/api/focus');
+  state.focus = r.focus;
+  state.focusMax = r.max_length;
+  focusCells.forEach((cell) => cell.refresh());
+}
+
 function renderInstances() {
   const grid = $('fleet');
-  grid.hidden = state.instances.length < 2;
+  grid.hidden = !state.instances.length;  // shown for one service too: its Focus box is here
   if (grid.hidden) return;
   const services = [...new Set(state.instances.map((i) => i.service))];
   const environments = [...new Set(state.instances.map((i) => i.environment))]
@@ -1504,13 +1560,15 @@ function renderInstances() {
   // A cell's instance is named by where it is deployed: its own name, or its OBP-API instance's for an OBP app
   const placeOf = (i) => i.parent || i.name;
   const head = el('tr', {}, [el('th', { scope: 'col', textContent: 'Service' }),
-                             ...environments.map((e) => el('th', { scope: 'col', textContent: e }))]);
+                             ...environments.map((e) => el('th', { scope: 'col', textContent: e })),
+                             el('th', { scope: 'col', textContent: 'Focus' })]);
   const rows = services.map((service) => {
     const of = state.instances.filter((i) => i.service === service);
     return el('tr', {}, [
       el('th', { scope: 'row' }, [service, el('span', { className: 'kind', textContent: of[0].kind })]),
       ...environments.map((e) => el('td', {}, of.filter((i) => i.environment === e)
         .map((i) => instanceButton(i, placeOf(i))))),
+      focusCell(service),
     ]);
   });
   grid.replaceChildren(el('table', {}, [el('thead', {}, [head]), el('tbody', {}, rows)]));
@@ -1950,6 +2008,7 @@ loadSource();
 (async () => {
   try {
     state.instances = await api('/api/instances');
+    await loadFocus().catch(() => {});  // the Focus boxes start from what was saved
   } catch (e) {
     $('watching').textContent = `Could not load: ${e.message}`;
     return;

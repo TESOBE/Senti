@@ -13,7 +13,9 @@ import threading
 import time
 from pathlib import Path
 
+from . import focus
 from .analyst import GIT_READ_COMMANDS, run_claude, unavailable_reason
+from .context import focus_text
 from .config import Config
 from .home import home
 from .source import Reviews, open_reviews
@@ -52,6 +54,8 @@ def command(config: Config) -> list[str]:
     tools += [f"Bash(git -C {source} {c} *)" for c in GIT_READ_COMMANDS]
     prompt = (f"Review the next {config.scan_endpoints} endpoints of the OBP-API source review. The OBP-API "
               f"source is at {source}; use that path literally (e.g. git -C {source} show ...).")
+    if wanted := focus.get([config], config.service):
+        prompt += "\n\n" + focus_text(config.service, wanted)
     return [
         config.claude_command, "-p", prompt, "--agent", AGENT,
         "--output-format", "stream-json", "--verbose",

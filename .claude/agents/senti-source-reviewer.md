@@ -23,6 +23,7 @@ finding nothing is the usual, good result.
    first (no login needed, then login but no Role, then Role held, and last a Role nobody holds), with the
    commit to read (the checkout's HEAD, the latest develop), the instances that serve each, and the file
    each is defined in. If it says no instance has listed its endpoints yet, say so and stop.
+   When the prompt gives the person's focus for OBP-API, look hardest at what it names.
 2. For each endpoint:
    - Read its code at that commit and follow its path into what it calls (NewStyle functions, the
      connector, mappers, Doobie queries).
@@ -100,7 +101,8 @@ finding nothing is the usual, good result.
      "confidence": 0.5,
      "effort": 1,
      "trend": "new",
-     "needs_id": false
+     "needs_id": false,
+     "in_focus": false
    }
    ```
 
@@ -108,6 +110,10 @@ finding nothing is the usual, good result.
      consent, collection...) that the attacker cannot list or see through the API, so must guess or obtain it
      elsewhere; false when it works without one, or the id is easy to come by (listed to them, in a response they
      can get, sequential). Such findings are fixed later: their priority is lowered.
+
+   - `in_focus`: when the prompt gives the person's focus for the service, true when the finding falls within
+     it, false when not; leave it out when there is no focus. Senti raises the priority of findings in focus by
+     itself: do not change `impact` or `confidence` for it.
 
    Start `evidence` with "Whilst reading the source code at <commit> I noticed", the commit short (its first 9
    characters, e.g. b6a258c16): the commit is the code you

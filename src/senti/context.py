@@ -1,9 +1,11 @@
 """What every AI run is told about the service it works on: its name, kind, instance, environment and where its
 source is, then what Senti knows about that kind of code (the kind's notes) and about this service (its notes in
-senti.toml, or a pack's: every OBP app's). Generic agents and prompts say "the service"; this says which."""
+senti.toml, or a pack's: every OBP app's), and last what the person wants Senti to focus on (focus.py). Generic agents
+and prompts say "the service"; this says which."""
 
 from pathlib import Path
 
+from . import focus
 from .config import Config
 from .kinds import kind_of
 
@@ -18,4 +20,11 @@ def service_context(config: Config) -> str:
         parts.append(f"About {kind.name} code:\n{kind.notes}")
     if config.service_notes:
         parts.append(f"About {config.service}:\n{config.service_notes}")
+    if wanted := focus.get([config], config.service):
+        parts.append(focus_text(config.service, wanted))
     return "\n\n".join(parts)
+
+
+def focus_text(service: str, wanted: str) -> str:
+    return (f"The person's focus for {service}, in their words (look into what it names first, and set `in_focus` "
+            f"on each finding: true when it falls within it, false when not):\n{wanted}")
