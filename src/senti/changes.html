@@ -76,6 +76,7 @@ body.with-diff main, body.with-diff .bar { max-width: 1680px; }
 body.with-diff #layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 24px; align-items: start; }
 #diff { position: sticky; top: 12px; max-height: calc(100vh - 24px); display: flex; flex-direction: column;
   background: var(--surface); border: 1px solid var(--line); border-radius: 6px; margin-top: 24px; }
+#diff[hidden] { display: none; }  /* its display: flex would otherwise keep a closed panel on screen */
 #diff .head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
 #diff .head strong { font: 600 13px var(--mono); overflow-wrap: anywhere; flex: 1; }
 #diff pre { margin: 0; border: 0; border-radius: 0 0 6px 6px; overflow: auto; flex: 1; padding: 8px 0; background: none; }
