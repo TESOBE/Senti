@@ -40,6 +40,8 @@ APPS = {
                 "obp-oidc", "scala-http4s"),
     "populator": App("public_obp_sandbox_populator_url", "/monitoring", "FRONTEND_SOURCE",
                      "OpenBankProject/OBP-Frontend", "sandbox-populator", "sveltekit", "apps/sandbox-populator"),
+    "conformator": App("public_obp_conformator_url", "/monitoring", "FRONTEND_SOURCE", "OpenBankProject/OBP-Frontend",
+                       "conformator", "sveltekit", "apps/conformator"),
 }
 
 

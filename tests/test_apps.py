@@ -33,10 +33,11 @@ def test_each_instance_has_the_apps_its_app_directory_lists_using_its_settings(c
         "public_obp_api_explorer_url": "http://localhost:5173/", "public_obp_portal_url": "http://localhost:5174",
         "public_obp_oidc_url": "http://localhost:9000",
         "public_obp_sandbox_populator_url": "http://localhost:5178/",
+        "public_obp_conformator_url": "http://localhost:5185",
         "public_obp_hola_url": "http://localhost:8087"}  # not an app Senti watches
     app_directories["https://obp.ogcr"] = {"public_obp_api_explorer_url": "https://explorer.ogcr"}
     configs = {c.name: c for c in Config.all_from_env()}
-    assert list(configs) == ["local", "local-explorer", "local-portal", "local-oidc", "local-populator", "ogcr",
+    assert list(configs) == ["local", "local-explorer", "local-portal", "local-oidc", "local-populator", "local-conformator", "ogcr",
                              "ogcr-explorer"]
     assert not configs["local"].is_app and configs["local"].telemetry_prefixes == ["obp.api."]
     explorer, portal, ogcr_explorer = configs["local-explorer"], configs["local-portal"], configs["ogcr-explorer"]
@@ -50,6 +51,9 @@ def test_each_instance_has_the_apps_its_app_directory_lists_using_its_settings(c
     populator = configs["local-populator"]
     assert (populator.obp_base_url, populator.monitoring_path, populator.obp_api_source) == (
         "http://localhost:5178", "/monitoring", "/src/frontend")
+    conformator = configs["local-conformator"]
+    assert (conformator.service, conformator.obp_base_url, conformator.folder) == (
+        "conformator", "http://localhost:5185", "apps/conformator")
 
 
 def test_apps_found_before_are_kept_when_obp_api_cannot_be_reached(config, monkeypatch, app_directories):

@@ -169,18 +169,18 @@ Instead of `SENTINEL_INSTANCES` and prefixed settings, Senti can read what it wa
 
 A service can also be read through Prometheus and Loki. Name the servers in `[prometheus] url` and `[loki] url`, the service's `sources` (for example `["prometheus", "loki"]`, or `["obp", "prometheus"]` for OBP-API, where each kind of data comes from the first source that offers it), and on each instance which of the data is its own: `prometheus = 'job="shop",instance="shop-1:9464"'` (label matchers) and `loki = '{app="shop",env="production"}'` (a stream selector). `PROMETHEUS_TOKEN` and `LOKI_TOKEN` in `.env`, if set, are sent as bearer tokens. A Loki with `auth_enabled` needs its tenant: `tenant = "1"` in `[loki]` is sent as `X-Scope-OrgID`. By default a level's lines are those whose text names the level; with `level_from = "detected_level"` in `[loki]` (Loki 3) they are the lines Loki itself gives that level, so a line that only mentions the word does not count. Colour codes in the lines are removed. A service read only this way needs no OIDC client.
 
-A service's kind says what its code is: `obp-api`, `sveltekit` (API Manager, Portal, Cohort, Sandbox Populator), `vue-express` (API Explorer II), `scala-http4s` (OBP-OIDC) `spring-boot` (Java or Kotlin on Spring Boot, built with Maven: Fix this works for it too) or `rust-tracing` (a Rust service that logs the tracing crate's JSON lines; its message is the template and its fields the values; Fix this is not set up for it yet). What Senti learns from your responses is kept per kind: dismissing a kind of finding on the Portal does not push it down on OBP-API.
+A service's kind says what its code is: `obp-api`, `sveltekit` (API Manager, Portal, Cohort, Sandbox Populator, Conformator), `vue-express` (API Explorer II), `scala-http4s` (OBP-OIDC) `spring-boot` (Java or Kotlin on Spring Boot, built with Maven: Fix this works for it too) or `rust-tracing` (a Rust service that logs the tracing crate's JSON lines; its message is the template and its fields the values; Fix this is not set up for it yet). What Senti learns from your responses is kept per kind: dismissing a kind of finding on the Portal does not push it down on OBP-API.
 
-### Apps: API Explorer II, the API Manager, the Portal, Cohort, OBP-OIDC, the Sandbox Populator
+### Apps: API Explorer II, the API Manager, the Portal, Cohort, OBP-OIDC, the Sandbox Populator, Conformator
 
 These apps serve their own log cache and Telemetry, in OBP-API's shape, at `/api/monitoring/...` (API Explorer
-II) and `/monitoring/...` (API Manager, Portal, Cohort, OBP-OIDC, Sandbox Populator). Each is listed on the app's `/status` page. They check
+II) and `/monitoring/...` (API Manager, Portal, Cohort, OBP-OIDC, Sandbox Populator, Conformator). Each is listed on the app's `/status` page. They check
 Senti's token with OBP-API (`GET /obp/v7.0.0/banks/SYS/my/roles/ROLE`), so they need the same Roles as
 OBP-API's own endpoints: `CanGetSystemLogCache<Level>` (or `CanGetSystemLogCacheAll`) and `CanGetTelemetry`.
 
 Senti finds each OBP-API instance's apps in its public app directory (`GET /obp/v6.0.0/app-directory`:
 `public_obp_api_explorer_url`, `public_obp_api_manager_url`, `public_obp_portal_url`, `public_obp_cohort_url`,
-`public_obp_oidc_url`, `public_obp_sandbox_populator_url`), read at startup and kept in
+`public_obp_oidc_url`, `public_obp_sandbox_populator_url`, `public_obp_conformator_url`), read at startup and kept in
 the instance's database for when OBP-API cannot be reached. Each app becomes an instance of its own, named
 `<instance>-<app>` (`local-explorer`) and shown as a tab after its OBP-API instance. The only settings are the
 checkouts the analyst reads, shared by all instances:

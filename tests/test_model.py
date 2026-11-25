@@ -125,7 +125,8 @@ def test_import_env_keeps_each_instance_name_as_its_id(config, monkeypatch):
     obp_api = setup.service("obp-api")
     assert (obp_api.kind, obp_api.source, obp_api.repository, obp_api.sonarcloud) == (
         "obp-api", "/src/OBP-API", "https://github.com/OpenBankProject/OBP-API", "OpenBankProject_OBP-API")
-    assert [s.name for s in setup.services] == ["obp-api", "api-manager", "portal", "cohort", "sandbox-populator"]
+    assert [s.name for s in setup.services] == ["obp-api", "api-manager", "portal", "cohort", "sandbox-populator",
+                                                 "conformator"]
     assert parse(tomllib.loads(to_toml(setup))).instances == setup.instances
 
 
