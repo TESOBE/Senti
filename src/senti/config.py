@@ -269,6 +269,9 @@ class Config:
             return os.environ[name] if name else default
 
         monitoring_path = APPS[app].monitoring_path if is_app else ""
+        # Senti itself has no url in senti.toml: its instance is at Senti's own page
+        ui_host, ui_port = env("SENTINEL_UI_HOST", "127.0.0.1"), int(env("SENTINEL_UI_PORT", "8765"))
+        own_url = f"http://{ui_host}:{ui_port}"
         # With senti.toml: the OBP-API instance (an app's parent), its service, and the app's service if listed
         setup = current_setup()
         listed = setup.instance(parent or name) if setup else None
@@ -308,7 +311,7 @@ class Config:
             service_notes=((app_service and app_service.notes)
                            or APP_NOTES + (f" Its code is in `{APPS[app].folder}/` of its checkout." if APPS[app].folder else "")
                            if is_app else obp_service.notes if listed else ""),
-            obp_base_url=(_app_urls(parent)[app] if is_app else listed.url if listed
+            obp_base_url=(_app_urls(parent)[app] if is_app else (listed.url or own_url) if listed
                           else env("OBP_BASE_URL", "http://localhost:8080")).rstrip("/"),
             monitoring_path=monitoring_path,
             parent=parent,
@@ -317,7 +320,7 @@ class Config:
             oidc_client_secret=oidc("CLIENT_SECRET"),
             oidc_client_setting=(f"{credentials}_CLIENT_ID" if listed
                                  else setting("OIDC_CLIENT_ID") or _prefix(name) + "OIDC_CLIENT_ID"),
-            obp_api_url=(Config.from_env(parent).obp_base_url if is_app else listed.url if listed
+            obp_api_url=(Config.from_env(parent).obp_base_url if is_app else (listed.url or own_url) if listed
                          else env("OBP_BASE_URL", "http://localhost:8080").rstrip("/")),
             log_cache_api_version=env("OBP_LOG_CACHE_API_VERSION", "v5.1.0"),
             telemetry_api_version=env("OBP_TELEMETRY_API_VERSION", "v7.0.0"),
@@ -348,8 +351,8 @@ class Config:
             max_per_week=int(env("SENTINEL_MAX_PER_WEEK", "10")),
             min_priority=float(env("SENTINEL_MIN_PRIORITY", "1.0")),
             snooze_days=int(env("SENTINEL_SNOOZE_DAYS", "7")),
-            ui_host=env("SENTINEL_UI_HOST", "127.0.0.1"),
-            ui_port=int(env("SENTINEL_UI_PORT", "8765")),
+            ui_host=ui_host,
+            ui_port=ui_port,
             analyse_minutes=int(env("SENTINEL_ANALYSE_MINUTES", "60")),
             analyse_min_watch_hours=float(env("SENTINEL_ANALYSE_MIN_WATCH_HOURS", "2")),
             analyse_budget_usd=float(env("SENTINEL_ANALYSE_BUDGET_USD", "10")),

@@ -69,7 +69,7 @@ discover = true
 # prometheus = 'job="shop"'
 # loki = '{app="shop",env="production"}'
 #
-# Senti watching itself: its own warnings and errors, read from memory, with no credentials.
+# Senti watching itself: its own warnings and errors, read from memory, with no url or credentials.
 # [[service]]
 # name = "senti"
 # kind = "python"
@@ -81,4 +81,4 @@ discover = true
 # id = "senti-local"
 # service = "senti"
 # environment = "local"
-# url = "http://127.0.0.1:8765"
+# 

@@ -64,7 +64,7 @@ class Instance:
     id: str  # service.instance.id; also names its database (sentinel-<id>.db) and digests (digests/<id>)
     service: str
     environment: str
-    url: str
+    url: str  # "" for Senti itself (read only from the senti source): its own page's address is used
     credentials: str = ""  # the prefix of its OIDC client settings in the environment
     discover: bool = True  # also watch the apps listed in its app directory, in the same environment
     prometheus: str = ""  # its series in Prometheus, as label matchers: job="obp-api",instance="localhost:9464"
@@ -92,6 +92,11 @@ class Setup:
 
     def instance(self, instance_id: str) -> Instance | None:
         return next((i for i in self.instances if i.id == instance_id), None)
+
+
+def reads_only_senti(service: Service) -> bool:
+    """Whether the service is Senti itself, read only from the senti source: its instances need no url or credentials."""
+    return service.sources == ("senti",)
 
 
 def setup_path() -> Path:
@@ -161,7 +166,7 @@ def parse(data: dict, path: str = "") -> Setup:
         discover = t.get("discover", True)
         if not isinstance(discover, bool):
             raise SetupError(f"{where}: discover must be true or false")
-        instances.append(Instance(instance_id, service, environment, _text(t, "url", where, required=True).rstrip("/"),
+        instances.append(Instance(instance_id, service, environment, _text(t, "url", where).rstrip("/"),
                                   credentials, discover, _text(t, "prometheus", where), _text(t, "loki", where)))
 
     for label, names in (("service", [s.name for s in services]), ("environment", [e.name for e in environments]),
@@ -186,6 +191,8 @@ def parse(data: dict, path: str = "") -> Setup:
         if i.environment not in {e.name for e in environments}:
             raise SetupError(f"instance {i.id}: there is no environment {i.environment!r}")
         service = by_name[i.service]
+        if not i.url and not reads_only_senti(service):
+            raise SetupError(f"instance {i.id}: url is missing")
         if "obp-app" in service.sources:
             raise SetupError(f"instance {i.id}: OBP apps are found in their OBP-API instance's app directory "
                              "(discover = true), not listed")
@@ -242,7 +249,7 @@ def to_toml(setup: Setup) -> str:
         out += ["[[environment]]", f"name = {_quoted(e.name)}", ""]
     for i in setup.instances:
         out += ["[[instance]]", f"id = {_quoted(i.id)}", f"service = {_quoted(i.service)}",
-                f"environment = {_quoted(i.environment)}", f"url = {_quoted(i.url)}"]
+                f"environment = {_quoted(i.environment)}", *([f"url = {_quoted(i.url)}"] if i.url else [])]
         if i.credentials:
             out.append(f"credentials = {_quoted(i.credentials)}")
         out += [f"{k} = {_quoted(getattr(i, k))}" for k in ("prometheus", "loki") if getattr(i, k)]

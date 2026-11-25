@@ -1,10 +1,14 @@
 import logging
+import tomllib
 from dataclasses import replace
+
+import pytest
 
 from senti import logs
 from senti.collector import Collector
 from senti.config import Config
 from senti.kinds import kind_of
+from senti.model import SetupError, parse, to_toml
 from senti.signatures import find_exception, parse_line, signature_of
 from senti.sources import source_for
 from senti.sources.senti import SentiSource
@@ -24,7 +28,6 @@ name = "local"
 id = "senti-local"
 service = "senti"
 environment = "local"
-url = "http://127.0.0.1:8765"
 """
 
 PYTHON = kind_of("python")
@@ -78,6 +81,17 @@ def test_senti_is_set_up_in_senti_toml_without_credentials_or_app_directory(tmp_
     assert (senti.name, senti.service, senti.kind, senti.read_from) == ("senti-local", "senti", "python", ("senti",))
     assert senti.obp_api_source == "/srv/work/Senti" and not senti.oidc_client_id and not senti.is_app
     assert isinstance(source_for(senti), SentiSource)
+    assert senti.obp_base_url == f"http://{senti.ui_host}:{senti.ui_port}"  # Senti's own page: no url to keep in step
+    monkeypatch.setenv("SENTINEL_UI_PORT", "9000")
+    assert Config.from_env("senti-local").obp_base_url == f"http://{senti.ui_host}:9000"
+
+
+def test_only_senti_may_leave_out_its_url():
+    setup = parse(tomllib.loads(SETUP))
+    assert setup.instance("senti-local").url == "" and "url" not in to_toml(setup).split("[[instance]]")[1]
+    other = SETUP.replace('sources = ["senti"]', 'sources = ["loki"]').replace('[[instance]]', '[loki]\nurl = "http://loki"\n\n[[instance]]') + 'loki = \'{app="senti"}\'\n'
+    with pytest.raises(SetupError, match="url is missing"):
+        parse(tomllib.loads(other))
 
 
 def test_the_collector_counts_sentis_own_errors(config, tmp_path, monkeypatch):
