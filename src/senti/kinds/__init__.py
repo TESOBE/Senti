@@ -5,7 +5,8 @@ kind (preferences.py).
 
 Each general kind is a module here; a pack adds its own (packs/obp: obp-api). sveltekit, vue-express and scala-http4s
 take the OBP log format for now, which the OBP apps of those kinds need for their signature ids to stay the same;
-spring-boot has its own (Logback's default layout), and rust-tracing reads JSON lines.
+spring-boot has its own (Logback's default layout), rust-tracing reads JSON lines, and python reads the logging
+module's lines as Senti writes them.
 """
 
 import re
@@ -80,10 +81,10 @@ def notes(path: Path) -> str:
 
 def _all() -> dict[str, Kind]:
     from ..packs import obp
-    from . import rust_tracing, scala_http4s, spring_boot, sveltekit, vue_express
+    from . import python, rust_tracing, scala_http4s, spring_boot, sveltekit, vue_express
 
     return {k.name: k for k in (*obp.kinds(), sveltekit.KIND, vue_express.KIND, scala_http4s.KIND, spring_boot.KIND,
-                                  rust_tracing.KIND)}
+                                  rust_tracing.KIND, python.KIND)}
 
 
 KINDS = _all()

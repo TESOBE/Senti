@@ -2,7 +2,8 @@
 
 A source offers what it can, named in `offers`, and the collector polls only that. It records what comes back; it
 knows nothing about where it came from. The general sources, any company's to use, are modules here: `prometheus`
-(Telemetry, metrics and the running commit, from Prometheus's query API) and `loki` (log lines, from Loki's). A pack
+(Telemetry, metrics and the running commit, from Prometheus's query API), `loki` (log lines, from Loki's) and `senti`
+(Senti's own log lines, from memory: Senti watching itself). A pack
 adds its own: packs/obp has `obp` (OBP-API's own endpoints) and `obp-app` (an OBP app's /monitoring endpoints).
 
 An instance can read several sources (its service's `sources` in senti.toml): each kind of data comes from the first
@@ -72,8 +73,10 @@ def sources() -> dict[str, type[Source]]:
     from ..packs import obp
     from .loki import LokiSource
     from .prometheus import PrometheusSource
+    from .senti import SentiSource
 
-    return {PrometheusSource.name: PrometheusSource, LokiSource.name: LokiSource, **obp.sources()}
+    return {PrometheusSource.name: PrometheusSource, LokiSource.name: LokiSource, SentiSource.name: SentiSource,
+            **obp.sources()}
 
 
 class Combined(Source):

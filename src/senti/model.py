@@ -26,8 +26,8 @@ LOKI_LEVELS_FROM = ("text", "detected_level")
 NAME = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 ENV_PREFIX = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
-# Listed as instances: OBP-API (read through the obp source, and Prometheus or Loki if its service says so), and any
-# service read only through Prometheus and Loki. The OBP apps are not listed: they are found in their OBP-API
+# Listed as instances: OBP-API (read through the obp source, and Prometheus or Loki if its service says so), any
+# service read only through Prometheus and Loki, and Senti itself (read through the senti source, with no credentials). The OBP apps are not listed: they are found in their OBP-API
 # instance's app directory (discover = true), and use its OIDC client.
 OBP_API = "obp-api"
 
@@ -191,7 +191,7 @@ def parse(data: dict, path: str = "") -> Setup:
                              "(discover = true), not listed")
         if service.kind != OBP_API and (not service.sources or "obp" in service.sources):
             raise SetupError(f"instance {i.id}: a {service.kind} service is read from Prometheus or Loki: give "
-                             f"service {service.name} sources, e.g. [\"prometheus\", \"loki\"]")
+                             f"service {service.name} sources, e.g. [\"prometheus\", \"loki\"] (or [\"senti\"] for Senti itself)")
         for section in ("prometheus", "loki"):
             if section in service.sources and not getattr(i, section):
                 raise SetupError(f"instance {i.id}: its service reads {section}: say which of its data is this "

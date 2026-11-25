@@ -1,0 +1,4 @@
+- The code is a Python project managed with uv: `pyproject.toml` at the top, source in `src/<package>/`, tests in `tests/`, run with `uv run pytest`.
+- A log line is `date time,milliseconds LEVEL [instance URL] logger: message`. The logger is the module that wrote it (`senti.collector`), so start reading there. The instance URL, when there is one, says which watched instance the line is about.
+- A logged exception (`logger.exception`) is followed by its traceback: the frames from the outermost call to the innermost, and the last line names the exception and its message. Look at the innermost frame in the project's own code, not in a library.
+- A warning is often a failed read of another system that Senti or the service keeps going after: check whether the line says what failed, and whether the code says what the person should do about it.
