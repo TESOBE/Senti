@@ -22,7 +22,7 @@ from importlib.resources import files
 
 import httpx
 
-from . import build, classes, fixer, focus, history, preferences, probes, recheck, replies, setup_page, sonar
+from . import build, classes, commits, fixer, focus, history, preferences, probes, recheck, replies, setup_page, sonar
 from .analyst import Analyst, check_claude, decide, unavailable_reason
 from .config import Config, current_setup
 from .health import health
@@ -50,6 +50,8 @@ QUEUE_TESTS_PATH = "/api/fix-queue/tests"
 FIX_BUILD_PATH = "/api/fix-queue/fix-the-build"
 FIX_RATED_PATH = "/api/fix-queue/fix-all-rated"
 CLAUDE_CHECK_PATH = "/api/claude-check"
+COMMITS_POST_PATH = re.compile(r"^/api/commits/(suggest|groups|stage|commit)$")
+COMMITS_BODY_BYTES = 200_000  # the groups of a large change: every path and message
 MAX_BODY_BYTES = 10_000
 COMMIT_HASH = re.compile(r"\b(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\b")  # at least one letter: not a plain number
 _commits: dict[tuple[str, str], dict | None] = {}  # commits never change, so neither do their dates and authors
@@ -388,6 +390,17 @@ def make_handler(configs: list[Config], allowed_hosts: set[str], analysts: dict[
                 return self._send(HTTPStatus.OK, page("fixed.html"), "text/html; charset=utf-8")
             if path == "/setup":
                 return self._send(HTTPStatus.OK, page("setup.html"), "text/html; charset=utf-8")
+            if path == "/commit":
+                return self._send(HTTPStatus.OK, page("commit.html"), "text/html; charset=utf-8")
+            if path == "/api/commits":  # the checkouts to commit in, and how many files each has changed
+                return self._json(HTTPStatus.OK, commit_checkouts(configs))
+            if path == "/api/commits/state":
+                if checkout := self._checkout():
+                    try:
+                        self._json(HTTPStatus.OK, commits.state(checkout))
+                    except ValueError as e:
+                        self._json(HTTPStatus.CONFLICT, {"error": str(e)})
+                return
             if path == "/api/setup":
                 return self._json(HTTPStatus.OK, setup_page.status(configs, self._with_store))
             if path == "/api/help":
@@ -438,6 +451,8 @@ def make_handler(configs: list[Config], allowed_hosts: set[str], analysts: dict[
             if self.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
                 return self._json(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": "Send application/json"})
             path = urlsplit(self.path).path
+            if action := COMMITS_POST_PATH.match(path):
+                return self._commits(action.group(1))
             if path == "/api/source/scanner":
                 return self._turn_scanner()
             if path == CLAUDE_CHECK_PATH:
@@ -601,6 +616,41 @@ def make_handler(configs: list[Config], allowed_hosts: set[str], analysts: dict[
                 return self._json(HTTPStatus.OK, {"ok": True, "not_queued": reason})
             self._json(HTTPStatus.OK, {"ok": True, **fixer.queue(config, int(match.group(1)), first=True)})
 
+        def _checkout(self) -> commits.Checkout | None:
+            """The checkout of the service named with `?service=`, or None (and a 404 sent) if it has none."""
+            names = parse_qs(urlsplit(self.path).query).get("service")
+            checkout = commits.checkout_of(configs, names[0]) if names else None
+            if checkout is None:
+                self._json(HTTPStatus.NOT_FOUND, {"error": "No such service with a checkout set"})
+            return checkout
+
+        def _commits(self, action: str):
+            """Commit page actions: suggest groups, save the person's edit of them, stage a group, commit it."""
+            checkout = self._checkout()
+            if checkout is None:
+                return
+            length = int(self.headers.get("Content-Length") or 0)
+            if length > COMMITS_BODY_BYTES:
+                return self._json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "Too large"})
+            try:
+                body = json.loads(self.rfile.read(length) or b"{}")
+            except json.JSONDecodeError:
+                return self._json(HTTPStatus.BAD_REQUEST, {"error": "Invalid JSON"})
+            if not isinstance(body, dict):
+                return self._json(HTTPStatus.BAD_REQUEST, {"error": "Send a JSON object"})
+            try:
+                if action == "suggest":
+                    if reason := unavailable_reason(checkout.config, scheduled=False):
+                        return self._json(HTTPStatus.CONFLICT, {"error": reason})
+                    return self._json(HTTPStatus.OK, commits.suggest(checkout))
+                if action == "groups":
+                    return self._json(HTTPStatus.OK, {"groups": commits.save_groups(checkout.source, body.get("groups"))})
+                if action == "stage":
+                    return self._json(HTTPStatus.OK, commits.stage(checkout, body.get("files")))
+                return self._json(HTTPStatus.OK, commits.commit(checkout, body.get("id"), body.get("subject"), body.get("body", "")))
+            except ValueError as e:
+                return self._json(HTTPStatus.CONFLICT, {"error": str(e)})
+
         def _save_focus(self):
             length = int(self.headers.get("Content-Length") or 0)
             if length > MAX_BODY_BYTES:
@@ -675,6 +725,18 @@ def make_server(configs: list[Config], host: str, port: int, extra_hosts: tuple[
     allowed_hosts.update(f"{name}:{port}" for name in names)
     logger.info("Senti UI on http://%s:%s", host, port)
     return server
+
+
+def commit_checkouts(configs: list[Config]) -> list[dict]:
+    """The checkouts the Commit page can commit in: their services, and how many files are changed in each."""
+    out = []
+    for checkout in commits.checkouts(configs):
+        try:
+            changed = len(commits.changes(checkout.source)) if commits.is_git(checkout.source) else None
+        except ValueError:
+            changed = None
+        out.append({"source": checkout.source, "services": checkout.services, "changed": changed})
+    return out
 
 
 def help_text(configs: list[Config]) -> dict:

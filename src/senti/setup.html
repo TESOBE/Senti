@@ -136,7 +136,7 @@ function renderServices(services) {
     return el('tr', {}, [
       el('td', {}, [el('strong', { textContent: s.name }), el('br'), sub(`${s.kind}: ${s.kind_description}`)]),
       el('td', {}, s.checkout
-        ? [code(s.checkout), ...(s.checkout_is_git ? [] : [' ', mark(false, '', 'not a git checkout')]),
+        ? [code(s.checkout), ...(s.checkout_is_git ? [' ', el('a', { href: '/commit?service=' + encodeURIComponent(s.name), textContent: 'Commit changes' })] : [' ', mark(false, '', 'not a git checkout')]),
            ...(s.folder ? [el('br'), 'Its code is in ', code(`${s.folder}/`)] : []),
            ...(s.repository ? [el('br'), sub(s.repository)] : [])]
         : [mark(false, '', 'No checkout'), ' Set its source in senti.toml, so the analyst can read the code.']),

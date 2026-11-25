@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Senti Commit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+// The theme chosen on the main page, if any
+try { const t = localStorage.getItem('sentinel-theme'); if (t) document.documentElement.dataset.theme = t; } catch {}
+</script>
+<style>
+:root {
+  --bg: #F4F5F2; --surface: #FFFFFF; --ink: #16181D; --muted: #5A5F66; --line: #D9DCD5; --accent: #0B5F5B;
+  --sans: 'IBM Plex Sans', system-ui, sans-serif; --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121416; --surface: #1B1E21; --ink: #E8EAE4; --muted: #A2A8AE; --line: #2E3338; --accent: #4FB3AC;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121416; --surface: #1B1E21; --ink: #E8EAE4; --muted: #A2A8AE; --line: #2E3338; --accent: #4FB3AC;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--sans); }
+header { background: var(--surface); border-bottom: 1px solid var(--line); }
+.bar { max-width: 1000px; margin: 0 auto; padding: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
+.bar strong { font-size: 18px; }
+a { color: var(--accent); }
+main { max-width: 1000px; margin: 0 auto; padding: 8px 16px 64px; overflow-wrap: break-word; }
+h1 { font-size: 28px; line-height: 1.2; margin: 24px 0 8px; }
+h2 { font-size: 20px; margin: 40px 0 8px; padding-top: 16px; border-top: 1px solid var(--line); }
+h3 { font-size: 16px; margin: 24px 0 4px; }
+.lead { color: var(--muted); font-size: 18px; margin: 0 0 16px; }
+code { font: 14px var(--mono); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+pre { font: 13px/1.4 var(--mono); background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+  padding: 12px; overflow-x: auto; }
+table { border-collapse: collapse; } th, td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; }
+li { margin: 4px 0; }
+.source { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; margin-top: 40px; }
+.item { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px; margin: 12px 0; }
+.item h2 { font-size: 17px; margin: 0 0 4px; padding: 0; border: 0; }
+.meta { color: var(--muted); font-size: 14px; margin: 0 0 8px; }
+.item p { margin: 4px 0; }
+.brand { display: inline-flex; align-items: center; gap: 10px; }
+footer.from { margin: 0 auto; padding: 0 16px 32px; color: var(--muted); font-size: 13px; text-align: center; }
+footer.from a { color: inherit; }
+button { font: 14px var(--sans); min-height: 36px; padding: 0 14px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--surface); color: var(--ink); cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); font-weight: 600; }
+button:disabled { opacity: 0.55; cursor: default; }
+input[type="text"], textarea, select { font: 15px/1.5 var(--sans); color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px 8px; width: 100%; }
+textarea { min-height: 7em; field-sizing: content; resize: vertical; }
+input.subject { font-weight: 600; }
+label.field { display: block; font-size: 13px; color: var(--muted); margin: 8px 0 2px; }
+.files { list-style: none; padding: 0; margin: 8px 0; }
+.files li { display: flex; align-items: center; gap: 8px; margin: 2px 0; font: 13px var(--mono); overflow-wrap: anywhere; }
+.files li select { width: auto; font-size: 13px; padding: 2px 4px; }
+.tag { font: 12px var(--sans); border: 1px solid var(--line); border-radius: 10px; padding: 0 6px; color: var(--muted); white-space: nowrap; }
+.tag.staged { border-color: var(--accent); color: var(--accent); }
+.tag.secret { border-color: #B3261E; color: #B3261E; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+.said { font-size: 14px; color: var(--muted); }
+.said.error { color: #B3261E; }
+.item.staged { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.services a { font-weight: 600; }
+</style>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg width='24' height='28' role='img' aria-label='Senti' viewBox='0 0 96 110' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2349B5D2'%3E%3Cg transform='rotate(25 48 21)'%3E%3Crect x='46' y='9' width='4' height='12'/%3E%3Ccircle cx='48' cy='7' r='6'/%3E%3C/g%3E%3Cpath fill-rule='evenodd' d='M48 19.5a44.5 44.5 0 1 0 0.01 0Zm0 5a39.5 39.5 0 1 1 -0.01 0Z'/%3E%3Cpath fill-rule='evenodd' d='M27 62a21 21 0 1 0 42 0a21 21 0 1 0 -42 0ZM43.5 58a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0Z'/%3E%3Ccircle cx='49.5' cy='54.5' r='3'/%3E%3C/g%3E%3C/svg%3E">
+</head>
+<body>
+<header>
+  <div class="bar">
+    <span class="brand"><svg width="24" height="28" role="img" aria-label="Senti" viewBox="0 0 96 110" xmlns="http://www.w3.org/2000/svg"><g fill="#49B5D2"><g transform="rotate(25 48 21)"><rect x="46" y="9" width="4" height="12"/><circle cx="48" cy="7" r="6"/></g><path fill-rule="evenodd" d="M48 19.5a44.5 44.5 0 1 0 0.01 0Zm0 5a39.5 39.5 0 1 1 -0.01 0Z"/><path fill-rule="evenodd" d="M27 62a21 21 0 1 0 42 0a21 21 0 1 0 -42 0ZM43.5 58a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0Z"/><circle cx="49.5" cy="54.5" r="3"/></g></svg><strong>Senti</strong></span>
+    <a href="/">Back to the suggestions</a>
+    <a href="/commit">Commit</a>
+  </div>
+</header>
+<main>
+<h1 id="title">Commit changes</h1>
+<p class="lead" id="lead">Loading…</p>
+<p class="said" id="said" role="status"></p>
+<div id="content"></div>
+</main>
+<footer class="from">Senti from <a href="https://www.tesobe.com">TESOBE</a> · <a href="https://github.com/TESOBE/Senti">Senti on GitHub</a></footer>
+<script>
+// Paths and messages come from the checkout and from Claude: set as text, never as HTML.
+const el = (tag, props = {}, children = []) => { const e = Object.assign(document.createElement(tag), props); e.append(...children); return e; };
+const $ = (id) => document.getElementById(id);
+const service = new URLSearchParams(location.search).get('service');
+const api = (action) => `/api/commits/${action}?service=${encodeURIComponent(service)}`;
+let data = null;        // the state, as Senti last sent it
+let saveTimer = null;   // a pending save of the person's edits
+let polling = null;
+
+function say(text, error = false) { $('said').textContent = text; $('said').className = error ? 'said error' : 'said'; }
+
+async function post(url, body) {
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const answer = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(answer.error || `HTTP ${r.status}`);
+  return answer;
+}
+
+// The list of services with a checkout, when no service is named
+async function showServices() {
+  const list = await fetch('/api/commits').then((r) => r.json());
+  $('lead').textContent = list.length
+    ? 'Pick a service to group its uncommitted changes into commits. Services that share a checkout share one page.'
+    : 'No service has a checkout set. Set its source in senti.toml.';
+  $('content').replaceChildren(el('ul', { className: 'services' }, list.map((c) => el('li', {}, [
+    el('a', { href: '/commit?service=' + encodeURIComponent(c.services[0]), textContent: c.services.join(', ') }),
+    ` · ${c.source} · `,
+    c.changed === null ? 'not a git checkout' : c.changed ? `${c.changed} changed file${c.changed === 1 ? '' : 's'}` : 'nothing to commit',
+  ]))));
+}
+
+const byPath = () => Object.fromEntries((data.changes || []).map((c) => [c.path, c]));
+
+function fileTags(c) {
+  const tags = [el('span', { className: 'tag', textContent: c.state })];
+  if (c.staged) tags.push(el('span', { className: 'tag staged', textContent: c.unstaged ? 'partly staged' : 'staged' }));
+  if (c.secret) tags.push(el('span', { className: 'tag secret', textContent: 'usually holds secrets: not staged here' }));
+  return tags;
+}
+
+// Keep the edits: saved a moment after the last change, and at once before Stage or Commit
+function saveSoon() { clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 600); }
+async function saveNow() {
+  clearTimeout(saveTimer); saveTimer = null;
+  const groups = data.groups.map(({ id, subject, body, files }) => ({ id, subject, body, files }));
+  try { await post(api('groups'), { groups }); } catch (e) { say(`Could not keep your edits: ${e.message}`, true); }
+}
+
+function moveFile(path, toId) {
+  for (const g of data.groups) g.files = g.files.filter((f) => f !== path);
+  if (toId === 'new') {
+    let n = data.groups.length + 1;
+    while (data.groups.some((g) => g.id === `g${n}`)) n++;
+    data.groups.push({ id: `g${n}`, subject: '', body: '', files: [path] });
+  } else if (toId) {
+    data.groups.find((g) => g.id === toId).files.push(path);
+  }
+  regroup(); render(); saveSoon();
+}
+
+function regroup() {
+  const grouped = new Set(data.groups.flatMap((g) => g.files));
+  data.not_grouped = data.changes.map((c) => c.path).filter((p) => !grouped.has(p));
+}
+
+function moveSelect(path, currentId) {
+  const select = el('select', { 'aria-label': `Move ${path} to another group` }, [
+    el('option', { value: '', textContent: currentId ? 'Move to…' : 'Add to…' }),
+    ...data.groups.filter((g) => g.id !== currentId).map((g, i) =>
+      el('option', { value: g.id, textContent: `Group ${data.groups.indexOf(g) + 1}${g.subject ? ': ' + g.subject.slice(0, 40) : ''}` })),
+    el('option', { value: 'new', textContent: 'A new group' }),
+    ...(currentId ? [el('option', { value: 'none', textContent: 'No group' })] : []),
+  ]);
+  select.addEventListener('change', () => select.value && moveFile(path, select.value === 'none' ? null : select.value));
+  return select;
+}
+
+function groupCard(g, number) {
+  const files = byPath();
+  const subject = el('input', { type: 'text', className: 'subject', value: g.subject, maxLength: 200, id: `subject-${g.id}` });
+  const body = el('textarea', { value: g.body, id: `body-${g.id}` });
+  subject.addEventListener('input', () => { g.subject = subject.value; saveSoon(); });
+  body.addEventListener('input', () => { g.body = body.value; saveSoon(); });
+  const stageButton = el('button', { type: 'button', textContent: g.staged ? 'Stage again' : 'Stage these files', disabled: !g.files.length });
+  const commitButton = el('button', { type: 'button', className: 'primary', textContent: 'Commit', disabled: !g.staged,
+    title: g.staged ? '' : 'Stage these files first' });
+  const removeButton = el('button', { type: 'button', textContent: 'Remove group' });
+  stageButton.addEventListener('click', () => act(`Staging group ${number}…`, async () => {
+    await saveNow();
+    const r = await post(api('stage'), { files: g.files });
+    return `Staged ${r.staged.length} file${r.staged.length === 1 ? '' : 's'} of group ${number}. Anything staged before was unstaged.`;
+  }));
+  commitButton.addEventListener('click', () => act(`Committing group ${number}…`, async () => {
+    await saveNow();
+    const r = await post(api('commit'), { id: g.id, subject: g.subject, body: g.body });
+    return `Committed ${r.sha}: ${r.subject}`;
+  }));
+  removeButton.addEventListener('click', () => { data.groups = data.groups.filter((x) => x !== g); regroup(); render(); saveSoon(); });
+  return el('article', { className: g.staged ? 'item staged' : 'item' }, [
+    el('h2', { textContent: `Group ${number}${g.staged ? ' · staged' : ''}` }),
+    el('label', { className: 'field', htmlFor: subject.id, textContent: 'Subject' }), subject,
+    el('label', { className: 'field', htmlFor: body.id, textContent: 'Body: one line per paragraph, a blank line between paragraphs' }), body,
+    el('label', { className: 'field', textContent: g.files.length ? `Files (${g.files.length})` : 'No files left in this group' }),
+    el('ul', { className: 'files' }, g.files.map((f) => el('li', {}, [
+      el('span', { textContent: f }), ...(files[f] ? fileTags(files[f]) : []), moveSelect(f, g.id)]))),
+    el('div', { className: 'row' }, [stageButton, commitButton, removeButton]),
+  ]);
+}
+
+function render() {
+  const h = data.head || {};
+  $('title').textContent = `Commit changes in ${data.source.split('/').pop()}`;
+  $('lead').textContent = `${data.source} · ${data.services.join(', ')}` +
+    (h.branch ? ` · on ${h.branch}` : '') + (h.sha ? ` at ${h.sha} (${h.subject})` : ' · no commits yet');
+  if (data.error) return $('content').replaceChildren(el('p', { textContent: data.error }));
+  const files = byPath();
+  const suggestButton = el('button', { type: 'button', className: data.groups.length ? '' : 'primary',
+    textContent: data.suggesting ? 'Grouping…' : data.groups.length ? 'Group the changes again' : 'Group the changes',
+    disabled: data.suggesting || !data.changes.length });
+  suggestButton.addEventListener('click', () => {
+    if (data.groups.length && !confirm('Group the changes again? The groups and your edits of them are replaced.')) return;
+    act('Asking Claude to group the changes…', async () => { await post(api('suggest'), {}); return ''; });
+  });
+  const intro = !data.changes.length ? 'Nothing to commit: the checkout has no changes.'
+    : data.suggesting ? `Claude is reading the changes and grouping them, since ${new Date(data.suggesting_since * 1000).toLocaleTimeString()}. This takes a minute or two.`
+    : data.groups.length ? 'Edit each message, move files between groups, then stage a group and commit it, in any order. Stage replaces whatever is staged, so a commit holds only its group.'
+    : `${data.changes.length} changed file${data.changes.length === 1 ? '' : 's'}. Claude reads them and suggests commits, each with its message and files; nothing is staged until you press Stage.`;
+  const otherStaged = data.staged.filter((p) => !data.groups.some((g) => g.staged && (g.files.includes(p) || g.files.some((f) => files[f]?.from === p))));
+  $('content').replaceChildren(
+    el('p', { textContent: intro }),
+    ...(data.suggest_error ? [el('p', { className: 'said error', textContent: `Grouping failed: ${data.suggest_error}` })] : []),
+    el('div', { className: 'row' }, [suggestButton,
+      ...(data.cost_usd != null && data.groups.length ? [el('span', { className: 'said', textContent: `Grouped for $${data.cost_usd.toFixed(2)}` })] : [])]),
+    ...data.groups.map((g, i) => groupCard(g, i + 1)),
+    ...(data.not_grouped.length ? [el('h2', { textContent: `Not in a group (${data.not_grouped.length})` }),
+      el('ul', { className: 'files' }, data.not_grouped.map((p) => el('li', {}, [
+        el('span', { textContent: p }), ...(files[p] ? fileTags(files[p]) : []), moveSelect(p, null)])))] : []),
+    ...(otherStaged.length && !data.groups.some((g) => g.staged) ? [el('p', { className: 'said',
+      textContent: `Staged now, not by a group here: ${otherStaged.join(', ')}. Stage a group to replace it.` })] : []),
+  );
+}
+
+async function load() {
+  const r = await fetch(api('state'));
+  data = await r.json();
+  if (!r.ok) { $('lead').textContent = data.error || `HTTP ${r.status}`; return; }
+  data.groups = data.groups || [];
+  data.staged = data.staged || [];
+  data.not_grouped = data.not_grouped || [];
+  render();
+  clearTimeout(polling);
+  if (data.suggesting) polling = setTimeout(load, 3000);
+}
+
+async function act(doing, fn) {
+  say(doing);
+  document.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+  try { say(await fn()); } catch (e) { say(e.message, true); }
+  await load();
+}
+
+(service ? load : showServices)().catch((e) => { $('lead').textContent = `Could not load: ${e.message}`; });
+</script>
+</body>
+</html>

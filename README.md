@@ -309,6 +309,14 @@ Trace history on a finding lists the commits that changed the lines it names (`g
 evidence names, oldest first), and starts a short Claude run (git read commands only) that reads their
 diffs and says which commit introduced the problem. Both are kept with the finding.
 
+### Commit page
+
+The Commit page (`/commit`, linked at the top of the page and from each service on the Setup page) groups the uncommitted changes in a service's checkout into commits. Services that share a checkout, such as the OBP-Frontend apps, share one page. Group the changes sends Claude the diff of each changed file and the start of each new file, with no tools, and Claude answers with groups, each with a commit message (a short plain subject, then plain English paragraphs, one line each) and its files. It takes a minute or two and costs a few cents to a dollar or so, at most $2.
+
+You can edit each message, move a file to another group, to a new one or to no group, and remove a group. Your edits are kept in `work/commits/`, so a reload keeps them. Stage puts exactly that group's files in the index, whole, after unstaging whatever was staged before. Commit commits only when exactly the group's files are staged, with your message, and the group leaves the page. The other groups stay, so you can commit them in any order. Files committed from your IDE meanwhile drop out of their groups.
+
+Senti runs git itself: it stages only paths that `git status` lists, never a path just because Claude named it. Files that usually hold secrets (`.env`, `.env.*` other than `.env.example`, private keys and similar) are named to Claude but never shown to it, and the page never stages them.
+
 When something stops Senti from watching an instance (missing OIDC settings, a token OBP-API rejects, missing
 Scopes, an OBP-API too old for an endpoint), the page lists what to fix, most blocking first, with what OBP-API
 answered. It reads and writes only Senti's databases (and reads commit dates and authors from the OBP-API

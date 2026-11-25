@@ -191,21 +191,31 @@ def describe(event: dict, full: bool = False) -> list[tuple[str, str]]:
 
 
 def run_claude(cmd: list[str], env: dict, timeout_minutes: int, on_step, stopped: threading.Event,
-               set_process=lambda process: None, full: bool = False) -> tuple[str | None, float | None, str | None, str | None]:
+               set_process=lambda process: None, full: bool = False, stdin_text: str | None = None,
+               result_max: int = 2000) -> tuple[str | None, float | None, str | None, str | None]:
     """Run headless Claude Code to the end, passing each step to `on_step(kind, text)`.
 
     Returns (error, cost in USD, result text, model); error is None when it succeeded. `set_process` is told the
-    process while it runs (and None after), so it can be stopped from another thread."""
+    process while it runs (and None after), so it can be stopped from another thread. `stdin_text` is sent on its
+    standard input, for a prompt too long for the command line; the result text is cut at `result_max`."""
     error, cost, result, model = None, None, None, None
     timed_out = threading.Event()
     try:
         with tempfile.TemporaryFile("w+") as stderr:
             process = subprocess.Popen(
-                cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=stderr,
+                cmd, stdin=subprocess.DEVNULL if stdin_text is None else subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr,
                 text=True, start_new_session=True, env={**os.environ, **env},
                 cwd=home(),  # so `work/` and `uv run senti` are Senti's own, whatever the caller's folder
             )
             set_process(process)
+            if stdin_text is not None:  # written from its own thread, so a full pipe cannot block reading the output
+                def send(pipe=process.stdin):
+                    try:
+                        pipe.write(stdin_text)
+                        pipe.close()
+                    except OSError:
+                        pass
+                threading.Thread(target=send, daemon=True).start()
             timer = threading.Timer(timeout_minutes * 60, lambda: (timed_out.set(), process.kill()))
             timer.start()
             try:
@@ -218,7 +228,7 @@ def run_claude(cmd: list[str], env: dict, timeout_minutes: int, on_step, stopped
                         model = event.get("model")
                     if event.get("type") == "result":
                         cost = event.get("total_cost_usd")
-                        result = (event.get("result") or "")[:2000]
+                        result = (event.get("result") or "")[:result_max]
                         if event.get("is_error") or event.get("subtype") != "success":
                             error = f"Claude Code stopped: {event.get('subtype')}"
                         continue
