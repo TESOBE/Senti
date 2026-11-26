@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import re
+import subprocess
 import threading
 import time
 from dataclasses import dataclass
@@ -142,6 +143,123 @@ def head(source: str) -> dict:
     return {"branch": branch or None, "sha": sha or None, "subject": subject or None}
 
 
+# Fetch, Pull, Pull (rebase) and Push: the checkout's branch and the remote branches it pulls from and pushes to.
+# Senti runs plain git, never a force push. git may not ask for a password or passphrase (no one could answer), so
+# a remote that needs one fails at once with git's message instead of hanging.
+
+REMOTE_TIMEOUT_SECONDS = 120
+SYNC_ACTIONS = ("fetch", "pull", "pull-rebase", "push")
+STOPPED_IN = {"MERGE_HEAD": "merge", "rebase-merge": "rebase", "rebase-apply": "rebase"}
+
+
+def _remote_git(source: str, *args: str) -> subprocess.CompletedProcess:
+    """git that talks to a remote: it may not prompt, and it gives up after REMOTE_TIMEOUT_SECONDS."""
+    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0",
+           "GIT_SSH_COMMAND": os.environ.get("GIT_SSH_COMMAND", "ssh") + " -o BatchMode=yes"}
+    try:
+        return subprocess.run(["git", "-C", source, *args], capture_output=True, text=True, env=env,
+                              timeout=REMOTE_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        raise ValueError(f"git {args[0]} took longer than {REMOTE_TIMEOUT_SECONDS} seconds and was stopped") from None
+
+
+def _ref(source: str, name: str) -> str | None:
+    """The remote branch a ref like @{upstream} or @{push} names, e.g. origin/develop; None if there is none."""
+    out = run_git(source, "rev-parse", "--abbrev-ref", "--symbolic-full-name", name)
+    return out.stdout.strip() if out.returncode == 0 and out.stdout.strip() else None
+
+
+def _count(source: str, commits: str) -> int:
+    out = run_git(source, "rev-list", "--count", commits)
+    return int(out.stdout.strip()) if out.returncode == 0 and out.stdout.strip().isdigit() else 0
+
+
+def stopped_in(source: str) -> str | None:
+    """"merge" or "rebase" when git stopped in the middle of one (a conflict), else None."""
+    git_dir = run_git(source, "rev-parse", "--absolute-git-dir").stdout.strip()
+    return next((what for name, what in STOPPED_IN.items() if git_dir and (Path(git_dir) / name).exists()), None)
+
+
+def push_remote(source: str, branch: str) -> str:
+    """The remote git pushes this branch to, in git's own order: its pushRemote, remote.pushDefault, its remote,
+    else origin."""
+    for key in (f"branch.{branch}.pushRemote", "remote.pushDefault", f"branch.{branch}.remote"):
+        if name := run_git(source, "config", key).stdout.strip():
+            return name
+    return "origin"
+
+
+def remote_state(source: str) -> dict:
+    """The branch, the remote branches it pulls from (upstream) and pushes to, how many commits it is ahead of and
+    behind its upstream as of the last fetch, and when that was."""
+    branch = run_git(source, "symbolic-ref", "--short", "-q", "HEAD").stdout.strip() or None
+    upstream = _ref(source, "@{upstream}") if branch else None
+    push = (_ref(source, "@{push}") or f"{push_remote(source, branch)}/{branch}") if branch else None
+    git_dir = run_git(source, "rev-parse", "--absolute-git-dir").stdout.strip()
+    fetch_head = Path(git_dir) / "FETCH_HEAD" if git_dir else None
+    return {"branch": branch, "upstream": upstream, "push_to": push,
+            "ahead": _count(source, "@{upstream}..HEAD") if upstream else None,
+            "behind": _count(source, "HEAD..@{upstream}") if upstream else None,
+            "fetched_at": int(fetch_head.stat().st_mtime) if fetch_head and fetch_head.exists() else None,
+            "stopped_in": stopped_in(source)}
+
+
+def _said(out: subprocess.CompletedProcess) -> str:
+    return (out.stderr.strip() or out.stdout.strip() or "it gave no reason")[-600:]
+
+
+def sync(checkout: Checkout, action: str) -> dict:
+    """Fetch, Pull, Pull (rebase) or Push, when the person presses it. Returns what happened, in a sentence."""
+    if action not in SYNC_ACTIONS:
+        raise ValueError(f"Not one of {', '.join(SYNC_ACTIONS)}")
+    source = checkout.source
+    with _lock(source):
+        if problem := git_problem(source):
+            raise ValueError(problem)
+        before = remote_state(source)
+        branch, upstream = before["branch"], before["upstream"]
+        if before["stopped_in"]:
+            raise ValueError(f"git stopped in the middle of a {before['stopped_in']}: finish it or abort it first "
+                             f"(git {before['stopped_in']} --continue, or git {before['stopped_in']} --abort)")
+        if action != "fetch" and not branch:
+            raise ValueError("The checkout is not on a branch (a detached HEAD): check out a branch first")
+        if action == "fetch":
+            out = _remote_git(source, "fetch", "--all", "--prune")
+            if out.returncode != 0:
+                raise ValueError(f"git fetch: {_said(out)}")
+            after = remote_state(source)
+            return {"said": "Fetched." + (f" {after['behind']} commit{'s' if after['behind'] != 1 else ''} to pull, "
+                                          f"{after['ahead']} to push." if after["upstream"] else "")}
+        if action in ("pull", "pull-rebase"):
+            if not upstream:
+                raise ValueError(f"{branch} has no upstream to pull from: push it first, or set one "
+                                 f"(git branch --set-upstream-to <remote>/<branch>)")
+            how = "--rebase" if action == "pull-rebase" else "--no-rebase"
+            out = _remote_git(source, "pull", how)
+            if out.returncode != 0:
+                if stopped := stopped_in(source):
+                    raise ValueError(f"git pull {how} stopped with conflicts. Resolve them in your editor, then git "
+                                     f"{stopped} --continue, or undo it with git {stopped} --abort. git said: {_said(out)}")
+                raise ValueError(f"git pull {how}: {_said(out)}")
+            head_now = run_git(source, "rev-parse", "--short", "HEAD").stdout.strip()
+            return {"said": f"Pulled from {upstream}{' with rebase' if how == '--rebase' else ''}: now at {head_now}."
+                            if "Already up to date" not in out.stdout else f"Already up to date with {upstream}."}
+        # Push: to the branch git would push to; a new branch is pushed with that as its upstream
+        if upstream:
+            out = _remote_git(source, "push")
+        else:
+            remote = push_remote(source, branch)
+            out = _remote_git(source, "push", "--set-upstream", remote, f"HEAD:refs/heads/{branch}")
+        if out.returncode != 0:
+            said = _said(out)
+            hint = (" The remote has commits you do not have: Pull (or Pull with rebase) first, then Push."
+                    if "rejected" in said and ("fetch first" in said or "non-fast-forward" in said) else "")
+            raise ValueError(f"git push: {said}{hint}")
+        after = remote_state(source)
+        return {"said": f"Pushed {branch} to {after['push_to'] or after['upstream']}."
+                        if "Everything up-to-date" not in out.stderr else "Nothing to push: everything is up to date."}
+
+
 # The suggested groups, kept in Senti's folder so a reload or a restart keeps them and the person's edits
 
 def _suggestions_file(source: str) -> Path:
@@ -216,7 +334,8 @@ def state(checkout: Checkout) -> dict:
     grouped = {f for g in groups for f in g["files"]}
     running = _running.get(source, {})
     return {
-        "source": source, "services": checkout.services, "head": head(source), "editor_url": checkout.config.editor_url,
+        "source": source, "services": checkout.services, "head": head(source), "remote": remote_state(source),
+        "editor_url": checkout.config.editor_url,
         "changes": listed, "staged": sorted(staged),
         "groups": groups, "not_grouped": [c["path"] for c in listed if c["path"] not in grouped],
         "suggested_at": saved.get("suggested_at"), "suggested_for": saved.get("suggested_for"),

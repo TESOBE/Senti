@@ -655,7 +655,7 @@ function renderHeader() {
   $('rules').textContent = `At most ${o.digest_size} per digest, ${o.max_per_week} a week.`;
 }
 
-// The OBP-API build on GitHub Actions (OBP_API_BUILD_ACTIONS_URL): green when it passed, red with the cause if not
+// The service's build: GitHub Actions of the repository its checkout pushes to; green when it passed, red with the cause if not
 function renderBuild(b) {
   $('build').hidden = !b;
   if (!b) return;

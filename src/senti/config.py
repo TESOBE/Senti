@@ -214,10 +214,10 @@ class Config:
     fix_worktree: str  # Fix this: Senti's own git worktree of the service's checkout, next to it, made when first needed
     fix_budget_usd: float  # most one fix may spend
 
-    build_actions_url: str  # the OBP-API build on GitHub Actions, shown at the top of the page (build.py)
     sonarcloud_project: str  # SonarCloud's key for OBP-API, read as another source of findings (sonar.py); "" for none
     loki_tenant: str = ""  # sent to Loki as X-Scope-OrgID, if it has auth_enabled
     loki_level_from: str = "text"  # "text": a level's lines name it; "detected_level": they carry Loki 3's level label
+    build_workflows: tuple[str, ...] = ()  # the GitHub Actions workflows checked (build.py); () = all of them
 
     @property
     def is_app(self) -> bool:
@@ -365,7 +365,8 @@ class Config:
             # Next to the service's own checkout: an app's fixes are made in a worktree of the app's code
             fix_worktree=(source.rstrip("/") + "-sentinel-fixes") if source else "",
             fix_budget_usd=float(env("SENTINEL_FIX_BUDGET_USD", "15")),
-            build_actions_url="" if is_app else obp_service.build if listed else env("OBP_API_BUILD_ACTIONS_URL", ""),
+            build_workflows=(app_service.workflows if app_service else () if is_app
+                             else obp_service.workflows if listed else ()),
             sonarcloud_project="" if is_app else obp_service.sonarcloud if listed else env("SONARCLOUD_PROJECT", ""),
         )
 
@@ -380,12 +381,12 @@ def setup_from_env() -> tuple[Setup, list[str]]:
     instances, environments, missing = [], [], []
     for name in _obp_instance_names():
         c = Config.from_env(name)
-        found = (c.obp_api_source, c.obp_api_github_repo, c.build_actions_url, c.sonarcloud_project)
+        found = (c.obp_api_source, c.obp_api_github_repo, c.sonarcloud_project)
         if found not in services:
             service_name = OBP_API_SERVICE if not services else f"{OBP_API_SERVICE}-{name}"
             services[found] = Service(service_name, OBP_API,
                                       f"https://github.com/{c.obp_api_github_repo}" if c.obp_api_github_repo else "",
-                                      *found[:1], *found[2:])
+                                      c.obp_api_source, c.sonarcloud_project)
         credentials = c.oidc_client_setting.removesuffix("_CLIENT_ID")
         for key in ("CLIENT_ID", "CLIENT_SECRET", "ISSUER"):
             if f"{credentials}_{key}" not in os.environ:

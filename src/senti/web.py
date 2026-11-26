@@ -50,7 +50,7 @@ QUEUE_TESTS_PATH = "/api/fix-queue/tests"
 FIX_BUILD_PATH = "/api/fix-queue/fix-the-build"
 FIX_RATED_PATH = "/api/fix-queue/fix-all-rated"
 CLAUDE_CHECK_PATH = "/api/claude-check"
-COMMITS_POST_PATH = re.compile(r"^/api/commits/(suggest|groups|stage|commit)$")
+COMMITS_POST_PATH = re.compile(r"^/api/commits/(suggest|groups|stage|commit|fetch|pull|pull-rebase|push)$")
 COMMITS_BODY_BYTES = 200_000  # the groups of a large change: every path and message
 MAX_BODY_BYTES = 10_000
 COMMIT_HASH = re.compile(r"\b(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\b")  # at least one letter: not a plain number
@@ -633,7 +633,8 @@ def make_handler(configs: list[Config], allowed_hosts: set[str], analysts: dict[
             return checkout
 
         def _commits(self, action: str):
-            """Changes page actions: suggest groups, save the person's edit of them, stage a group, commit it."""
+            """Changes page actions: suggest groups, save the person's edit of them, stage a group, commit it; and
+            fetch, pull, pull with rebase and push."""
             checkout = self._checkout()
             if checkout is None:
                 return
@@ -653,6 +654,8 @@ def make_handler(configs: list[Config], allowed_hosts: set[str], analysts: dict[
                     return self._json(HTTPStatus.OK, commits.suggest(checkout))
                 if action == "groups":
                     return self._json(HTTPStatus.OK, {"groups": commits.save_groups(checkout.source, body.get("groups"))})
+                if action in commits.SYNC_ACTIONS:
+                    return self._json(HTTPStatus.OK, commits.sync(checkout, action))
                 if action == "stage":
                     return self._json(HTTPStatus.OK, commits.stage(checkout, body.get("files")))
                 return self._json(HTTPStatus.OK, commits.commit(checkout, body.get("id"), body.get("subject"), body.get("body", "")))

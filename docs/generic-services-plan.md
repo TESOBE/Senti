@@ -19,7 +19,7 @@ The project, package and command are renamed to Senti (`senti` to `senti`, `sent
 | History | `history.py`, `lift-reference.md` | The Lift to http4s move in May 2026. |
 | Analyst and replies | `.claude/agents/senti-analyst.md`, `analyst.py`, `replies.py`, `classes.py` | The prompts talk about OBP-API and its apps. |
 | Web page | `web.py`, `ui.html` | One tab per OBP-API instance with its apps after it; help text read from OBP-API's Glossary. |
-| Build and SonarCloud | `build.py`, `sonar.py` | Already general, but set once for OBP-API (`OBP_API_BUILD_ACTIONS_URL`, `SONARCLOUD_PROJECT`) rather than per service. |
+| Build and SonarCloud | `build.py`, `sonar.py` | The build is per service: the GitHub Actions of the repository its checkout pushes to (optionally only its `workflows`), checked every quarter of an hour. SonarCloud is still set once for OBP-API (`SONARCLOUD_PROJECT`). |
 
 Already general: the store, the digest rules, preferences and learning, rechecks, the scanner's scheduling, budgets, and running Claude Code.
 
@@ -89,7 +89,7 @@ kind = "obp-api"
 sources = ["obp"]
 repository = "https://github.com/OpenBankProject/OBP-API"
 source = "/srv/work/OBP-API"
-build = "https://github.com/OpenBankProject/OBP-API/actions"
+workflows = ["Build and publish container develop"]  # optional: the GitHub Actions workflows that count; without it, all of them
 sonarcloud = "OpenBankProject_OBP-API"
 
 [[service]]

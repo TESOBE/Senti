@@ -52,6 +52,14 @@ checks, even where the logs show nothing wrong.
   the pull request for the branch your checkout is on. It leaves out test code. The issues of one rule in one file
   make one finding, with a link to each issue on SonarCloud. A finding SonarCloud no longer reports is marked fixed,
   unless you acted on it or dismissed it. `senti sonar` reads it now. Senti never changes anything on SonarCloud.
+- **Build** (GitHub Actions): for each service with a checkout, Senti reads the GitHub Actions of the repository
+  the checkout pushes to, on the branch it pushes to (git's `@{push}`, else `origin` and the current branch). The
+  latest run of each workflow counts; with `workflows = [...]` in the service's entry in `senti.toml`, only those
+  workflows count. The result is shown at the top of the page. While `senti run` runs, Senti also checks every
+  quarter of an hour: a workflow whose latest run failed becomes a "Fix the build" finding, which follows the
+  workflow's latest failed run while it keeps failing and is marked fixed when it passes again, unless you acted on
+  it or dismissed it. `senti build` checks now. Set `GITHUB_TOKEN` for a private repository, a higher rate limit
+  (GitHub allows 60 requests an hour without one) and the end of each failed job's log.
 - **Digest** (`senti digest`): the only thing people see. It is written only after enough hours of
   watching, holds at most 3 suggestions (and 10 a week), skips anything below the priority threshold or
   seen in only one bucket, and never repeats what was suggested, acted on, dismissed or fixed. When nothing
@@ -278,6 +286,7 @@ the Sandbox Populator (in OBP-Frontend) against it.
 | `senti feedback <id> relevant\|important\|urgent\|acted\|dismissed\|later\|fixed` | Respond to a suggestion |
 | `senti ui [--port 8765] [--no-analyst]` | Only the web page to read findings and respond to them |
 | `senti sonar` | Read SonarCloud's security and reliability issues into findings now |
+| `senti build` | Check the GitHub Actions build now, and bring its findings up to date |
 | `senti ignore <signature>` | Never show a signature again |
 | `senti source next [--n 3]` | The next endpoints to review, most reachable first, across all instances |
 | `senti source done <operation_id> <units> --commit <c>` | Record an endpoint as reviewed, with the files (or `path#function` in big files) read |
@@ -318,6 +327,8 @@ The Changes page (`/changes`, linked at the top of the page and from each servic
 You can edit each message, move a file to another group, to a new one or to no group, and remove a group. Your edits are kept in `work/commits/`, so a reload keeps them. Stage puts exactly that group's files in the index, whole, after unstaging whatever was staged before. Commit commits only when exactly the group's files are staged, with your message, and the group leaves the page. The other groups stay, so you can commit them in any order. Files committed from your IDE meanwhile drop out of their groups.
 
 Pressing a file's name shows its changes in a panel beside the groups (a new file's lines as added). Open, on each file and in the panel, opens it in your editor, and Open in Zed opens the checkout. These are links of the form `SENTINEL_EDITOR_URL` (`zed://file{path}` by default; `vscode://file{path}` for VS Code, `idea://open?file={path}` for IntelliJ IDEA), so your browser opens your editor on your screen, even when Senti runs as another user.
+
+The Remote section at the top says where the checkout's branch pulls from (its upstream) and pushes to, and how many commits it has to push and to pull, as of the last fetch. Fetch runs `git fetch --all --prune`, which changes nothing in the checkout. Pull runs `git pull --no-rebase` (a merge when both sides have new commits), and Pull (rebase) runs `git pull --rebase` (your commits on top of the upstream's). Push runs `git push`, after you confirm; a branch with no upstream yet is pushed to the remote git would push it to, which then becomes its upstream. Senti never force-pushes: when the remote has commits you don't, Push says to pull first. If a pull stops with conflicts, the page says so and the buttons wait until you finish it (`git merge --continue` or `git rebase --continue`) or abort it. git may not ask for a password or passphrase here, so a remote that needs one fails at once with git's message, and anything that takes longer than two minutes is stopped.
 
 Senti runs git itself: it stages only paths that `git status` lists, never a path just because Claude named it. Files that usually hold secrets (`.env`, `.env.*` other than `.env.example`, private keys and similar) are named to Claude but never shown to it, and the page never stages them.
 

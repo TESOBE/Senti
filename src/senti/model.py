@@ -42,10 +42,11 @@ class Service:
     kind: str
     repository: str = ""  # vcs.repository.url.full, e.g. https://github.com/OpenBankProject/OBP-API
     source: str = ""  # the local checkout Senti reads (and stages fixes in)
-    build: str = ""  # its build on GitHub Actions, e.g. https://github.com/OpenBankProject/OBP-API/actions
     sonarcloud: str = ""  # its SonarCloud project key
     notes: str = ""  # added to what the analyst is told about this service
     sources: tuple[str, ...] = ()  # where its data is read from (sources/), first first; () = its kind's usual one
+    workflows: tuple[str, ...] = ()  # the GitHub Actions workflows of the repository its checkout pushes to that
+                                     # Senti checks (build.py), by name; () = all of them
 
     @property
     def github_repo(self) -> str:
@@ -146,9 +147,12 @@ def parse(data: dict, path: str = "") -> Setup:
         sources = t.get("sources", [])
         if not isinstance(sources, list) or not all(isinstance(x, str) and NAME.match(x) for x in sources):
             raise SetupError(f'{where}: sources must be a list of source names, e.g. ["obp", "prometheus"]')
+        workflows = t.get("workflows", [])
+        if not isinstance(workflows, list) or not all(isinstance(x, str) and x.strip() for x in workflows):
+            raise SetupError(f'{where}: workflows must be a list of GitHub Actions workflow names, e.g. ["Build"]')
         services.append(Service(name, kind, *(_text(t, k, where) for k in
-                                              ("repository", "source", "build", "sonarcloud", "notes")),
-                                tuple(sources)))
+                                              ("repository", "source", "sonarcloud", "notes")),
+                                tuple(sources), tuple(x.strip() for x in workflows)))
 
     environments = [Environment(_name(t, "name", f"environment {n}"))
                     for n, t in enumerate(_tables(data, "environment"), 1)]
@@ -233,10 +237,10 @@ def to_toml(setup: Setup) -> str:
         out += ["[system]", f"name = {_quoted(setup.system)}", ""]
     for s in setup.services:
         out += ["[[service]]", f"name = {_quoted(s.name)}", f"kind = {_quoted(s.kind)}"]
-        out += [f"{k} = {_quoted(getattr(s, k))}" for k in ("repository", "source", "build", "sonarcloud", "notes")
+        out += [f"{k} = {_quoted(getattr(s, k))}" for k in ("repository", "source", "sonarcloud", "notes")
                 if getattr(s, k)]
-        if s.sources:
-            out.append(f"sources = [{', '.join(_quoted(x) for x in s.sources)}]")
+        out += [f"{k} = [{', '.join(_quoted(x) for x in getattr(s, k))}]" for k in ("sources", "workflows")
+                if getattr(s, k)]
         out.append("")
     for section in ("prometheus", "loki"):
         if url := getattr(setup, f"{section}_url"):

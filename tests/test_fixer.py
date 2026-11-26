@@ -391,7 +391,8 @@ def test_fix_the_build_puts_a_finding_of_the_failure_at_the_head_of_the_queue(cf
     queued = new_finding(cfg)
     fixer.queue(cfg, queued)
     monkeypatch.setattr(fixer.build, "failure", lambda config: {
-        "run_id": 5, "name": "Build", "sha": "abcdef1234567", "url": "https://github.com/x", "details": "Job compile failed."})
+        "key": "build:ada/OBP-API:develop:Build:5", "run_id": 5, "name": "Build", "sha": "abcdef1234567",
+        "url": "https://github.com/x", "repo": "ada/OBP-API", "branch": "develop", "details": "Job compile failed."})
     fid = fixer.fix_the_build(cfg)["finding_id"]
     assert fixer._next(cfg) == fid
     f = row(cfg, fid)

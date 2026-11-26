@@ -228,3 +228,88 @@ def test_a_folder_git_will_not_work_in_says_why(tmp_path, monkeypatch):
     monkeypatch.setattr(commits, "run_git", lambda *args, **kwargs: Refused())
     said = commits.git_problem(str(tmp_path))
     assert "another user" in said and f"git config --global --add safe.directory {tmp_path}" in said
+
+
+@pytest.fixture
+def remote_pair(tmp_path, config):
+    """A bare remote, the person's checkout of it on main, and another clone that pushes to it as well."""
+    remote, mine, other = tmp_path / "remote.git", tmp_path / "mine", tmp_path / "other"
+    git(tmp_path, "init", "-q", "--bare", "-b", "main", str(remote))
+    for clone in (mine, other):
+        git(tmp_path, "clone", "-q", str(remote), str(clone))
+        git(clone, "config", "user.name", "Test Person")
+        git(clone, "config", "user.email", "test@example.com")
+        git(clone, "checkout", "-q", "-b", "main")
+    (mine / "a.txt").write_text("one\n")
+    git(mine, "add", "-A")
+    git(mine, "commit", "-q", "-m", "First")
+    c = replace(config, obp_api_source=str(mine))
+    return commits.checkout_of([c], c.service), mine, other
+
+
+def commit_file(repo, name, text):
+    (repo / name).write_text(text)
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", f"Change {name}")
+
+
+def test_push_sets_the_upstream_of_a_new_branch_then_pushes_only_when_there_is_something(remote_pair):
+    checkout, mine, other = remote_pair
+    state = commits.remote_state(checkout.source)
+    assert (state["branch"], state["upstream"], state["push_to"]) == ("main", None, "origin/main")
+    assert "Pushed main to origin/main" in commits.sync(checkout, "push")["said"]
+    state = commits.remote_state(checkout.source)
+    assert (state["upstream"], state["ahead"], state["behind"]) == ("origin/main", 0, 0)
+    assert "Nothing to push" in commits.sync(checkout, "push")["said"]
+
+
+def test_fetch_counts_what_to_pull_and_a_rejected_push_says_to_pull_first(remote_pair):
+    checkout, mine, other = remote_pair
+    commits.sync(checkout, "push")
+    git(other, "pull", "-q", "origin", "main")
+    commit_file(other, "b.txt", "theirs\n")
+    git(other, "push", "-q", "origin", "main")
+    commit_file(mine, "c.txt", "mine\n")
+    assert "1 commit to pull, 1 to push" in commits.sync(checkout, "fetch")["said"]
+    with pytest.raises(ValueError, match="Pull \\(or Pull with rebase\\) first"):
+        commits.sync(checkout, "push")
+    assert "with rebase" in commits.sync(checkout, "pull-rebase")["said"]
+    state = commits.remote_state(checkout.source)
+    assert (state["ahead"], state["behind"]) == (1, 0)
+    assert git(mine, "log", "--format=%s").split("\n")[:3] == ["Change c.txt", "Change b.txt", "First"]
+    commits.sync(checkout, "push")
+    assert "Already up to date" in commits.sync(checkout, "pull")["said"]
+
+
+def test_a_conflicting_pull_says_how_to_go_on_and_the_buttons_wait_until_it_is_done(remote_pair):
+    checkout, mine, other = remote_pair
+    commits.sync(checkout, "push")
+    git(other, "pull", "-q", "origin", "main")
+    commit_file(other, "a.txt", "theirs\n")
+    git(other, "push", "-q", "origin", "main")
+    commit_file(mine, "a.txt", "mine\n")
+    with pytest.raises(ValueError, match="stopped with conflicts.*git merge --abort"):
+        commits.sync(checkout, "pull")
+    assert commits.remote_state(checkout.source)["stopped_in"] == "merge"
+    with pytest.raises(ValueError, match="middle of a merge"):
+        commits.sync(checkout, "push")
+    git(mine, "merge", "--abort")
+    with pytest.raises(ValueError, match="stopped with conflicts.*git rebase --abort"):
+        commits.sync(checkout, "pull-rebase")
+    assert commits.remote_state(checkout.source)["stopped_in"] == "rebase"
+
+
+def test_pull_needs_an_upstream_and_unknown_actions_are_refused(remote_pair):
+    checkout, mine, other = remote_pair
+    with pytest.raises(ValueError, match="no upstream"):
+        commits.sync(checkout, "pull")
+    with pytest.raises(ValueError, match="Not one of"):
+        commits.sync(checkout, "push --force")
+
+
+def test_the_changes_page_fetches_and_shows_the_remote(server):
+    port, service = server
+    status, data = call(port, "POST", f"/api/commits/fetch?service={service}", {})
+    assert status == 200 and json.loads(data)["said"] == "Fetched."  # the test checkout has no remote: nothing to fetch
+    status, data = call(port, "GET", f"/api/commits/state?service={service}")
+    assert json.loads(data)["remote"]["branch"] == "main"

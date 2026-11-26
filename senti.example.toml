@@ -11,6 +11,9 @@ kind = "obp-api"
 repository = "https://github.com/OpenBankProject/OBP-API"
 source = "/path/to/OBP-API"
 sonarcloud = "OpenBankProject_OBP-API"
+# Senti checks the GitHub Actions of the repository this checkout pushes to, on the branch it pushes to. Without
+# workflows, every workflow counts; with it, only those named.
+# workflows = ["Build and publish container develop"]
 
 [[service]]
 name = "api-explorer"

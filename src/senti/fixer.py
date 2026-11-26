@@ -289,16 +289,7 @@ def fix_the_build(config: Config) -> dict:
         raise ValueError("The build is not failing")
     store = Store(config.db_path)
     try:
-        finding_id = store.upsert_finding({
-            "key": f"build:{failed['run_id']}", "category": "bug",
-            "title": f"Fix the build: {failed['name']} fails at {failed['sha'][:9]}",
-            "summary": f"The {failed['name']} workflow on GitHub Actions fails at {failed['sha'][:9]}.",
-            "evidence": f"{failed['url']}\n{failed['details']}",
-            "hypothesis": "See the failed jobs, steps and log above.",
-            "files": [], "signature_ids": [],
-            "suggested_fix": "Find from the failure above why the build fails (a compile error or a failing test), and "
-                             "change the code, or the test if the test is wrong, so it passes.",
-            "impact": 5, "confidence": 1, "effort": 2, "trend": "new"})
+        finding_id = store.upsert_finding(build.as_finding(failed))
         status = store.db.execute("SELECT fix_status FROM findings WHERE id = ?", (finding_id,)).fetchone()[0]
         if status not in ("running", "staged"):  # fix_at 0: at the head of the queue
             store.db.execute("UPDATE findings SET fix_status = 'queued', fix = NULL, fix_at = 0, fix_tests = 1 "

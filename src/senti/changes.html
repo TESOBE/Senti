@@ -294,6 +294,43 @@ function groupCard(g, number) {
   ]);
 }
 
+// Fetch, Pull, Pull (rebase) and Push: where the branch pulls from and pushes to, and how far apart they are
+function remoteRow() {
+  const r = data.remote || {};
+  const plural = (n, what) => `${n} ${what}${n === 1 ? '' : 's'}`;
+  const where = !r.branch ? 'Not on a branch (a detached HEAD).'
+    : r.upstream ? `${r.branch} pulls from ${r.upstream}` + (r.push_to && r.push_to !== r.upstream ? ` and pushes to ${r.push_to}` : '') +
+      `: ${r.ahead ? plural(r.ahead, 'commit') + ' to push' : 'nothing to push'}, ` +
+      `${r.behind ? plural(r.behind, 'commit') + ' to pull' : 'nothing to pull'}` +
+      (r.fetched_at ? ` (as of the last fetch, ${new Date(r.fetched_at * 1000).toLocaleString()}).` : ' (not fetched yet).')
+    : `${r.branch} has no upstream yet: Push pushes it to ${r.push_to} and makes that its upstream.`;
+  const button = (label, action, doing, title, enabled = true, primary = false) => {
+    const b = el('button', { type: 'button', textContent: label, title, disabled: !enabled || !!r.stopped_in,
+                             className: primary ? 'primary' : '' });
+    b.addEventListener('click', () => {
+      if (action === 'push' && !confirm(`Push ${r.branch} to ${r.upstream ? (r.push_to || r.upstream) : r.push_to}?` +
+                                        (r.ahead ? ` ${plural(r.ahead, 'commit')} go${r.ahead === 1 ? 'es' : ''} out.` : ''))) return;
+      act(doing, async () => (await post(api(action), {})).said);
+    });
+    return b;
+  };
+  return el('div', {}, [
+    el('h2', { textContent: 'Remote' }),
+    el('p', { className: 'meta', textContent: where }),
+    ...(r.stopped_in ? [el('p', { className: 'said error', textContent: `git stopped in the middle of a ${r.stopped_in}. ` +
+      `Resolve the conflicts in your editor, then git ${r.stopped_in} --continue, or git ${r.stopped_in} --abort.` })] : []),
+    el('div', { className: 'row' }, [
+      button('Fetch', 'fetch', 'Fetching…', 'git fetch --all --prune: see what the remotes have, change nothing here'),
+      button('Pull', 'pull', 'Pulling…', 'git pull --no-rebase: bring in the upstream\'s commits, merging if both have new ones',
+             !!r.upstream),
+      button('Pull (rebase)', 'pull-rebase', 'Pulling with rebase…',
+             'git pull --rebase: bring in the upstream\'s commits and put yours on top of them', !!r.upstream),
+      button('Push', 'push', 'Pushing…', 'git push: never a force push', !!r.branch && (!r.upstream || r.ahead > 0),
+             !!r.ahead && !r.behind),
+    ]),
+  ]);
+}
+
 function render() {
   const h = data.head || {};
   $('title').textContent = `Changes in ${data.source.split('/').pop()}`;
@@ -314,6 +351,8 @@ function render() {
     : `${data.changes.length} changed file${data.changes.length === 1 ? '' : 's'}. Claude reads them and suggests commits, each with its message and files; nothing is staged until you press Stage.`;
   const otherStaged = data.staged.filter((p) => !data.groups.some((g) => g.staged && (g.files.includes(p) || g.files.some((f) => files[f]?.from === p))));
   $('content').replaceChildren(
+    remoteRow(),
+    el('h2', { textContent: 'Commits' }),
     el('p', { textContent: intro }),
     ...(data.suggest_error ? [el('p', { className: 'said error', textContent: `Grouping failed: ${data.suggest_error}` })] : []),
     el('div', { className: 'row' }, [suggestButton, ...(data.editor_url ? [openLink(null)] : [])]),

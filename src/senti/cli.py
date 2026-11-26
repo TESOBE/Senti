@@ -9,7 +9,7 @@ import threading
 import time
 from datetime import datetime, timezone
 
-from . import history, preferences, sonar
+from . import build, history, preferences, sonar
 from .analyst import Analyst, decide, start_scheduler, unavailable_reason
 from .collector import Collector
 from .scanner import Scanner
@@ -173,6 +173,16 @@ def cmd_sonar(args, config: Config, store: Store) -> None:
           f"{done['fixed']} marked fixed{pr}.")
 
 
+def cmd_build(args, config: Config, store: Store) -> None:
+    where = build.pushed_to(config.obp_api_source)
+    if not where:
+        raise SystemExit(f"{config.name} has no build: its checkout ({config.obp_api_source or 'none'}) does not "
+                         "push to GitHub.")
+    print(build.check(*where, config.build_workflows)["text"])
+    done = build.record(config)
+    print(f"{done['added']} findings added, {done['moved']} moved on to a later failed run, {done['fixed']} marked fixed.")
+
+
 def cmd_ignore(args, config: Config, store: Store) -> None:
     if not store.set_signature_status(args.signature_id, "dismissed"):
         sys.exit(f"No signature {args.signature_id}")
@@ -200,6 +210,7 @@ def cmd_run(args, configs: list[Config]) -> None:
     tracing = threading.Event()  # set to stop Trace history by itself
     threading.Thread(target=history.trace_forever, args=(configs, tracing), name="trace-history", daemon=True).start()
     threading.Thread(target=sonar.check_forever, args=(configs, tracing), name="sonarcloud", daemon=True).start()
+    threading.Thread(target=build.watch_forever, args=(configs, tracing), name="build", daemon=True).start()
     first = configs[0]
     server = serve_in_background(configs, args.host or first.ui_host, args.port or first.ui_port,
                                  tuple(args.allow_host), analysts, scanner)
@@ -360,6 +371,9 @@ def main(argv: list[str] | None = None) -> None:
 
     sub.add_parser("sonar", help="read SonarCloud's security and reliability issues into findings now").set_defaults(
         func=cmd_sonar)
+
+    sub.add_parser("build", help="check the GitHub Actions build now, and bring its findings up to date").set_defaults(
+        func=cmd_build)
 
     p = sub.add_parser("ignore", help="never show a signature again")
     p.add_argument("signature_id")
