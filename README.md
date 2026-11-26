@@ -52,6 +52,7 @@ checks, even where the logs show nothing wrong.
   the pull request for the branch your checkout is on. It leaves out test code. The issues of one rule in one file
   make one finding, with a link to each issue on SonarCloud. A finding SonarCloud no longer reports is marked fixed,
   unless you acted on it or dismissed it. `senti sonar` reads it now. Senti never changes anything on SonarCloud.
+- **Container image** (`image` on a service in senti.toml, e.g. `docker.io/openbankproject/obp-api:latest`): Senti asks the registry every hour whether the image has changed, and scans it with [Trivy](https://trivy.dev) when it has, or once a day. Trivy reads the image straight from the registry, so Senti needs no Docker. It tells the base image (the operating system packages the image is built on) apart from the app (the libraries the service ships). Senti keeps the high and critical vulnerabilities that have a fix: those of the base image make one finding, those of the app one finding per library. A finding the scan no longer reports is marked fixed. `senti image` scans now and prints the counts of both parts, at every severity; `senti image --last` prints the last scan. Install Trivy where Senti runs (or set `SENTINEL_TRIVY_COMMAND`); its first scan downloads its vulnerability database, a few GB in its cache.
 - **Build** (GitHub Actions): for each service with a checkout, Senti reads the GitHub Actions of the repository
   the checkout pushes to, on the branch it pushes to (git's `@{push}`, else `origin` and the current branch). The
   latest run of each workflow counts; with `workflows = [...]` in the service's entry in `senti.toml`, only those
@@ -319,6 +320,10 @@ instances it has a tab for each, showing how old the commit it runs (from its ro
 Trace history on a finding lists the commits that changed the lines it names (`git log -L`, from the commit its
 evidence names, oldest first), and starts a short Claude run (git read commands only) that reads their
 diffs and says which commit introduced the problem. Both are kept with the finding.
+
+### Add observation
+
+When you notice something Senti has not, such as an error on a page or a log file from one installation, press **Add observation** on the main page (`/make-observation`). Choose the service and its instance, say what you noticed and, if you like, attach a file such as a log file (at most 1,000,000 characters; of a longer file the page sends the end, the most recent lines). The analyst starts at once, or straight after the analysis that is running, without waiting for hours of data. It looks into the observation with the source code, raises or updates a finding where there is something to fix, and records its answer, which the page shows under the observation. From the command line: `senti noticed add "what you noticed" --file app.log`, `senti noticed list --all` and `senti noticed show <id>`.
 
 ### Changes page
 

@@ -215,6 +215,7 @@ class Config:
     fix_budget_usd: float  # most one fix may spend
 
     sonarcloud_project: str  # SonarCloud's key for OBP-API, read as another source of findings (sonar.py); "" for none
+    image: str = ""  # the service's published container image, scanned for known vulnerabilities (images.py); "" for none
     loki_tenant: str = ""  # sent to Loki as X-Scope-OrgID, if it has auth_enabled
     loki_level_from: str = "text"  # "text": a level's lines name it; "detected_level": they carry Loki 3's level label
     build_workflows: tuple[str, ...] = ()  # the GitHub Actions workflows checked (build.py); () = all of them
@@ -368,6 +369,7 @@ class Config:
             build_workflows=(app_service.workflows if app_service else () if is_app
                              else obp_service.workflows if listed else ()),
             sonarcloud_project="" if is_app else obp_service.sonarcloud if listed else env("SONARCLOUD_PROJECT", ""),
+            image=(app_service.image if app_service else "") if is_app else obp_service.image if listed else "",
         )
 
 

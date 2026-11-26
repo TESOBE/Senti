@@ -40,6 +40,7 @@ header { background: var(--surface); border-bottom: 1px solid var(--line); }
 .brand strong { font-size: 18px; letter-spacing: -0.01em; }
 .help-link { margin-left: auto; color: var(--accent); font-size: 14px; }
 .help-link + .help-link { margin-left: 0; }
+.add-observation { border: 1px solid var(--accent); border-radius: 6px; padding: 2px 10px; text-decoration: none; }
 #theme { min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px;
   background: none; color: var(--muted); font-size: 13px; cursor: pointer; }
 #theme:hover { color: var(--ink); border-color: var(--line-strong); }
@@ -348,6 +349,7 @@ footer.from a { color: inherit; }
       <svg width="24" height="28" role="img" aria-label="Senti" viewBox="0 0 96 110" xmlns="http://www.w3.org/2000/svg"><g fill="#49B5D2"><g transform="rotate(25 48 21)"><rect x="46" y="9" width="4" height="12"/><circle cx="48" cy="7" r="6"/></g><path fill-rule="evenodd" d="M48 19.5a44.5 44.5 0 1 0 0.01 0Zm0 5a39.5 39.5 0 1 1 -0.01 0Z"/><path fill-rule="evenodd" d="M27 62a21 21 0 1 0 42 0a21 21 0 1 0 -42 0ZM43.5 58a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0Z"/><circle cx="49.5" cy="54.5" r="3"/></g></svg>
       <strong>Senti</strong>
     </a>
+    <a class="help-link add-observation" id="observe-link" href="/make-observation" title="Tell Senti something you noticed on a service, such as a log file">Add observation</a>
     <a class="help-link" href="/fixed">Fixed</a>
     <a class="help-link" href="/changes">Changes</a>
     <a class="help-link" href="/setup">Setup</a>
@@ -416,6 +418,7 @@ footer.from a { color: inherit; }
         <div><small>Effort</small><b id="d-effort"></b></div>
         <div><small>Trend</small><b id="d-trend"></b></div>
       </div>
+      <div id="d-noticed" hidden><h3>What a person noticed</h3><div id="d-noticed-list"></div></div>
       <h3>Evidence</h3><p id="d-evidence"></p>
       <h3>Why it happens</h3><p id="d-hypothesis"></p>
       <h3>Where in OBP-API</h3><ul class="files" id="d-files"></ul>
@@ -841,6 +844,7 @@ function render() {
   const commits = current.evidence_commits || {};
   $('d-evidence').textContent = (current.evidence || '').replace(/\b[0-9a-f]{7,40}\b/g,
     (sha) => commits[sha] ? `${sha.slice(0, 9)} (${daysAgo(commits[sha].ts)})` : sha);  // a commit: short, and how old
+  renderNoticed(current);
   renderRecheck(current);
   renderFix(current);
   renderHistory(current);
@@ -910,6 +914,16 @@ function renderReply(f) {
   const earlier = comments.length - 1;
   $('d-comments-count').hidden = earlier < 1;
   $('d-comments-count').textContent = `${earlier} earlier comment${earlier === 1 ? '' : 's'}: Fix this follows them all.`;
+}
+
+// The observations from people (Make observation) that led to this finding, or that the analyst tied to it
+function renderNoticed(f) {
+  const noticed = f.noticed || [];
+  $('d-noticed').hidden = !noticed.length;
+  $('d-noticed-list').replaceChildren(...noticed.map((n) => el('p', {}, [
+    el('a', { href: '/make-observation?instance=' + encodeURIComponent(state.instance), textContent: `Observation of ${fmtDate(n.ts)}` }),
+    n.attachment_name ? ` (attached ${n.attachment_name})` : '', ': ', n.text,
+  ])));
 }
 
 function renderRecheck(f) {
@@ -1604,6 +1618,7 @@ function renderInstances() {
 function openInstance(name) {
   if (name === state.instance) return;
   state.instance = name;
+  document.getElementById('observe-link').href = '/make-observation?instance=' + encodeURIComponent(name);
   Object.assign(state, { tab: 'review', selected: null, findings: [], overview: null });
   activityData = null;
   history.replaceState(null, '', '#' + encodeURIComponent(name));

@@ -43,6 +43,7 @@ class Service:
     repository: str = ""  # vcs.repository.url.full, e.g. https://github.com/OpenBankProject/OBP-API
     source: str = ""  # the local checkout Senti reads (and stages fixes in)
     sonarcloud: str = ""  # its SonarCloud project key
+    image: str = ""  # its published container image, scanned for known vulnerabilities (images.py)
     notes: str = ""  # added to what the analyst is told about this service
     sources: tuple[str, ...] = ()  # where its data is read from (sources/), first first; () = its kind's usual one
     workflows: tuple[str, ...] = ()  # the GitHub Actions workflows of the repository its checkout pushes to that
@@ -151,7 +152,7 @@ def parse(data: dict, path: str = "") -> Setup:
         if not isinstance(workflows, list) or not all(isinstance(x, str) and x.strip() for x in workflows):
             raise SetupError(f'{where}: workflows must be a list of GitHub Actions workflow names, e.g. ["Build"]')
         services.append(Service(name, kind, *(_text(t, k, where) for k in
-                                              ("repository", "source", "sonarcloud", "notes")),
+                                              ("repository", "source", "sonarcloud", "image", "notes")),
                                 tuple(sources), tuple(x.strip() for x in workflows)))
 
     environments = [Environment(_name(t, "name", f"environment {n}"))
@@ -237,7 +238,7 @@ def to_toml(setup: Setup) -> str:
         out += ["[system]", f"name = {_quoted(setup.system)}", ""]
     for s in setup.services:
         out += ["[[service]]", f"name = {_quoted(s.name)}", f"kind = {_quoted(s.kind)}"]
-        out += [f"{k} = {_quoted(getattr(s, k))}" for k in ("repository", "source", "sonarcloud", "notes")
+        out += [f"{k} = {_quoted(getattr(s, k))}" for k in ("repository", "source", "sonarcloud", "image", "notes")
                 if getattr(s, k)]
         out += [f"{k} = [{', '.join(_quoted(x) for x in getattr(s, k))}]" for k in ("sources", "workflows")
                 if getattr(s, k)]

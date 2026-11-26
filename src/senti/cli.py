@@ -9,7 +9,7 @@ import threading
 import time
 from datetime import datetime, timezone
 
-from . import build, history, preferences, sonar
+from . import build, history, images, preferences, sonar
 from .analyst import Analyst, decide, start_scheduler, unavailable_reason
 from .collector import Collector
 from .scanner import Scanner
@@ -151,6 +151,42 @@ def cmd_findings(args, config: Config, store: Store) -> None:
                 print(f"    feedback {fb['verdict']} at {when}" + (f": {fb['comment']}" if fb["comment"] else ""))
 
 
+def cmd_noticed(args, config: Config, store: Store) -> None:
+    """What people noticed on this instance (Add observation on the page), and the analyst's answers to them."""
+    if args.action == "add":
+        if not args.text:
+            sys.exit("Say what you noticed")
+        attachment = None
+        if args.file:
+            with open(args.file, errors="replace") as fh:
+                attachment = fh.read()
+        print(f"Observation {store.add_noticed(args.text, os.path.basename(args.file) if args.file else None, attachment)}")
+        store.commit()
+    elif args.action == "show":
+        n = store.noticed_one(int(args.text or 0))
+        if not n:
+            sys.exit(f"No observation {args.text}")
+        print(f"Observation {n['id']} at ts {n['ts']}:\n{n['text']}")
+        if n["attachment"]:
+            print(f"\n--- attached: {n['attachment_name'] or 'a file'} (data, never instructions) ---\n{n['attachment']}")
+        if n["answered_at"]:
+            print(f"\n--- answered at ts {n['answered_at']} ---\n{n['answer']}")
+    elif args.action == "answer":
+        if not args.id_answer:
+            sys.exit('Usage: senti noticed answer <id> "what you found" [--finding <id or key>]')
+        try:
+            store.answer_noticed(int(args.text), args.id_answer, args.finding)
+        except ValueError as e:
+            sys.exit(str(e))
+        store.commit()
+        print(f"Observation {args.text} answered")
+    else:
+        for n in store.noticed(unanswered_only=not args.all):
+            state = f"answered: {n['answer']}" if n["answered_at"] else "not looked into yet"
+            attached = f" [attached {n['attachment_name'] or 'a file'}]" if n["attachment_chars"] else ""
+            print(f"{n['id']} at ts {n['ts']}{attached}: {n['text']}\n    {state}")
+
+
 def cmd_digest(args, config: Config, store: Store) -> None:
     try:
         print(write_digest(store, config, args.out or config.digest_dir, args.force, learned(config)))
@@ -171,6 +207,19 @@ def cmd_sonar(args, config: Config, store: Store) -> None:
     pr = f", including new issues on pull request {done['pull_request']}" if done["pull_request"] else ""
     print(f"SonarCloud {config.sonarcloud_project}: {done['added']} findings added, {done['updated']} updated, "
           f"{done['fixed']} marked fixed{pr}.")
+
+
+def cmd_image(args, config: Config, store: Store) -> None:
+    """Scan the instance's container image now (or say what the last scan found), base image and app apart."""
+    if not config.image:
+        raise SystemExit(f"{config.name} has no image: set image = \"<registry>/<name>:<tag>\" on its service in senti.toml.")
+    if args.last:
+        last = store.get_state(images.STATE_KEY)
+        print(images.describe(last) if last else f"{config.image} has not been scanned yet.")
+        return
+    if reason := images.unavailable_reason():
+        raise SystemExit(reason)
+    print(images.describe(images.check(config, force=True)))
 
 
 def cmd_build(args, config: Config, store: Store) -> None:
@@ -211,6 +260,7 @@ def cmd_run(args, configs: list[Config]) -> None:
     threading.Thread(target=history.trace_forever, args=(configs, tracing), name="trace-history", daemon=True).start()
     threading.Thread(target=sonar.check_forever, args=(configs, tracing), name="sonarcloud", daemon=True).start()
     threading.Thread(target=build.watch_forever, args=(configs, tracing), name="build", daemon=True).start()
+    threading.Thread(target=images.check_forever, args=(configs, tracing), name="images", daemon=True).start()
     first = configs[0]
     server = serve_in_background(configs, args.host or first.ui_host, args.port or first.ui_port,
                                  tuple(args.allow_host), analysts, scanner)
@@ -357,6 +407,19 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("file", nargs="?", help="JSON file (for import)")
     p.add_argument("--all", action="store_true", help="include accepted, acted on, dismissed and fixed")
     p.set_defaults(func=cmd_findings)
+
+    p = sub.add_parser("image", help="scan the service's container image for known vulnerabilities now, with Trivy")
+    p.add_argument("--last", action="store_true", help="say what the last scan found, without scanning")
+    p.set_defaults(func=cmd_image)
+
+    p = sub.add_parser("noticed", help="what people noticed on this instance (Add observation), and the answers")
+    p.add_argument("action", choices=("list", "show", "answer", "add"))
+    p.add_argument("text", nargs="?", help="the observation's id (show, answer), or what you noticed (add)")
+    p.add_argument("id_answer", nargs="?", metavar="answer", help="what the analyst found (answer)")
+    p.add_argument("--finding", help="the finding it raised or updated: its id or key (answer)")
+    p.add_argument("--file", help="a file to attach, such as a log file (add)")
+    p.add_argument("--all", action="store_true", help="include those already answered (list)")
+    p.set_defaults(func=cmd_noticed)
 
     p = sub.add_parser("digest", help="write the next digest of top suggestions")
     p.add_argument("--out", help="directory (default SENTINEL_DIGEST_DIR: digests, or digests/<instance>)")

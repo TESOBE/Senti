@@ -23,7 +23,7 @@ from importlib.resources import files
 import httpx
 
 from . import build, classes, commits, fixer, focus, history, preferences, probes, recheck, replies, setup_page, sonar
-from .analyst import Analyst, check_claude, decide, unavailable_reason
+from .analyst import Analyst, check_claude, decide, pid_alive, unavailable_reason
 from .config import Config, current_setup
 from .health import health
 from .packs.obp import help as obp_help
@@ -53,6 +53,9 @@ CLAUDE_CHECK_PATH = "/api/claude-check"
 COMMITS_POST_PATH = re.compile(r"^/api/commits/(suggest|groups|stage|commit|fetch|pull|pull-rebase|push)$")
 COMMITS_BODY_BYTES = 200_000  # the groups of a large change: every path and message
 MAX_BODY_BYTES = 10_000
+NOTICED_PATH = "/api/noticed"
+ATTACHMENT_MAX_CHARS = 1_000_000  # a log file the person adds to an observation
+NOTICED_BODY_BYTES = 6 * ATTACHMENT_MAX_CHARS + MAX_BODY_BYTES  # in JSON a character can take up to 6 bytes (\u0000)
 COMMIT_HASH = re.compile(r"\b(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\b")  # at least one letter: not a plain number
 _commits: dict[tuple[str, str], dict | None] = {}  # commits never change, so neither do their dates and authors
 
@@ -253,6 +256,19 @@ def analysis(store: Store, config: Config) -> dict:
     }
 
 
+def noticed_now(store: Store) -> dict:
+    """What people noticed on the instance, newest first, and the analysis running now, if any: the Make observation
+    page follows it until the analyst has answered."""
+    run = store.db.execute("SELECT id, started_at, pid FROM analysis_runs WHERE status = 'running' "
+                           "ORDER BY id DESC LIMIT 1").fetchone()
+    running = None
+    if run and pid_alive(run["pid"]):
+        step = store.db.execute("SELECT text FROM analysis_steps WHERE run_id = ? AND kind != 'thinking' "
+                                "ORDER BY id DESC LIMIT 1", (run["id"],)).fetchone()
+        running = {"id": run["id"], "started_at": run["started_at"], "step": step["text"] if step else None}
+    return {"observations": [dict(n) for n in store.noticed()], "running": running}
+
+
 RATINGS = (*GRADES, "later", "dismissed")  # the buttons above the evidence
 
 
@@ -275,6 +291,10 @@ def findings(store: Store, config: Config) -> list[dict]:
     cached = set(fixer.git(config.obp_api_source, "diff", "--cached", "--name-only").splitlines()) \
         if config.obp_api_source and any(f["fix_status"] == "staged" for f in store.findings()) else set()
     running = (running_commit(store, config) or {}).get("git_commit")
+    noticed: dict[int, list[dict]] = {}  # what people noticed (Make observation), by the finding it led to
+    for n in store.db.execute("SELECT id, ts, text, attachment_name, finding_id FROM noticed "
+                              "WHERE finding_id IS NOT NULL ORDER BY id"):
+        noticed.setdefault(n["finding_id"], []).append({k: n[k] for k in ("id", "ts", "text", "attachment_name")})
     result = []
     for f in store.findings():
         item = dict(f)
@@ -301,6 +321,7 @@ def findings(store: Store, config: Config) -> list[dict]:
             item["fix_now"] = fixer.where_committed(config.obp_api_source, sha.group(0), running)  # pushed, running
         item.pop("fix_patch", None)  # kept for Discard, not shown
         item["first_suggested"] = first_suggested.get(f["id"])
+        item["noticed"] = noticed.get(f["id"], [])
         item["comments"] = fixer.comments_of(store, f["id"])  # what people wrote; Fix this follows them
         item["feedback"] = latest_feedback.get(f["id"])
         item["rating"] = rating.get(f["id"])
@@ -392,6 +413,12 @@ def make_handler(configs: list[Config], allowed_hosts: set[str], analysts: dict[
                 return self._send(HTTPStatus.OK, page("setup.html"), "text/html; charset=utf-8")
             if path == "/changes":
                 return self._send(HTTPStatus.OK, page("changes.html"), "text/html; charset=utf-8")
+            if path == "/make-observation":
+                return self._send(HTTPStatus.OK, page("make-observation.html"), "text/html; charset=utf-8")
+            if path == NOTICED_PATH:  # what people noticed on the instance, and what the analyst made of it
+                if config := self._instance():
+                    self._json(HTTPStatus.OK, self._with_store(config, noticed_now))
+                return
             if path == "/api/commits":  # the checkouts to commit in, and how many files each has changed
                 return self._json(HTTPStatus.OK, commit_checkouts(configs))
             if path == "/api/commits/diff":  # one changed file's changes, for the panel beside the groups
@@ -461,6 +488,8 @@ def make_handler(configs: list[Config], allowed_hosts: set[str], analysts: dict[
             path = urlsplit(self.path).path
             if action := COMMITS_POST_PATH.match(path):
                 return self._commits(action.group(1))
+            if path == NOTICED_PATH:
+                return self._add_noticed()
             if path == "/api/source/scanner":
                 return self._turn_scanner()
             if path == CLAUDE_CHECK_PATH:
@@ -661,6 +690,42 @@ def make_handler(configs: list[Config], allowed_hosts: set[str], analysts: dict[
                 return self._json(HTTPStatus.OK, commits.commit(checkout, body.get("id"), body.get("subject"), body.get("body", "")))
             except ValueError as e:
                 return self._json(HTTPStatus.CONFLICT, {"error": str(e)})
+
+        def _add_noticed(self):
+            """Add observation: what the person noticed on an instance, and a file such as a log file. The analyst
+            looks into it now, or after the analysis that is running."""
+            config = self._instance()
+            if config is None:
+                return
+            length = int(self.headers.get("Content-Length") or 0)
+            if length > NOTICED_BODY_BYTES:
+                return self._json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "The file is too large"})
+            try:
+                body = json.loads(self.rfile.read(length) or b"{}")
+            except json.JSONDecodeError:
+                return self._json(HTTPStatus.BAD_REQUEST, {"error": "Invalid JSON"})
+            if not isinstance(body, dict):
+                return self._json(HTTPStatus.BAD_REQUEST, {"error": "Send a JSON object"})
+            text, name, attachment = body.get("text"), body.get("attachment_name"), body.get("attachment")
+            if not isinstance(text, str) or not text.strip():
+                return self._json(HTTPStatus.BAD_REQUEST, {"error": "Say what you noticed"})
+            if not isinstance(name, (str, type(None))) or not isinstance(attachment, (str, type(None))):
+                return self._json(HTTPStatus.BAD_REQUEST, {"error": "Send the file as text"})
+            if attachment and len(attachment) > ATTACHMENT_MAX_CHARS:
+                return self._json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                                  {"error": f"The file is too large: send at most {ATTACHMENT_MAX_CHARS:,} characters, "
+                                            "such as the end of the log"})
+
+            def add(store: Store) -> int:
+                noticed_id = store.add_noticed(text, (name or "").strip()[:200] or None, attachment)
+                store.commit()
+                return noticed_id
+
+            noticed_id = self._with_store(config, add)
+            if reason := unavailable_reason(config, scheduled=False):
+                return self._json(HTTPStatus.OK, {"id": noticed_id, "not_started": reason})
+            run_id = analysts[config.name].run("An observation from a person", background=True)
+            self._json(HTTPStatus.OK, {"id": noticed_id, "run_id": run_id})
 
         def _save_focus(self):
             length = int(self.headers.get("Content-Length") or 0)

@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Senti: add observation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+// The theme chosen on the main page, if any
+try { const t = localStorage.getItem('sentinel-theme'); if (t) document.documentElement.dataset.theme = t; } catch {}
+</script>
+<style>
+:root {
+  --bg: #F4F5F2; --surface: #FFFFFF; --ink: #16181D; --muted: #5A5F66; --line: #D9DCD5; --accent: #0B5F5B;
+  --sans: 'IBM Plex Sans', system-ui, sans-serif; --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121416; --surface: #1B1E21; --ink: #E8EAE4; --muted: #A2A8AE; --line: #2E3338; --accent: #4FB3AC;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121416; --surface: #1B1E21; --ink: #E8EAE4; --muted: #A2A8AE; --line: #2E3338; --accent: #4FB3AC;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--sans); }
+header { background: var(--surface); border-bottom: 1px solid var(--line); }
+.bar { max-width: 760px; margin: 0 auto; padding: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
+.bar strong { font-size: 18px; }
+a { color: var(--accent); }
+main { max-width: 760px; margin: 0 auto; padding: 8px 16px 64px; overflow-wrap: break-word; }
+h1 { font-size: 28px; line-height: 1.2; margin: 24px 0 8px; }
+h2 { font-size: 20px; margin: 40px 0 8px; padding-top: 16px; border-top: 1px solid var(--line); }
+h3 { font-size: 16px; margin: 24px 0 4px; }
+.lead { color: var(--muted); font-size: 18px; margin: 0 0 16px; }
+code { font: 14px var(--mono); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+pre { font: 13px/1.4 var(--mono); background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+  padding: 12px; overflow-x: auto; }
+table { border-collapse: collapse; } th, td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; }
+li { margin: 4px 0; }
+.source { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; margin-top: 40px; }
+.item { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px; margin: 12px 0; }
+.item h2 { font-size: 17px; margin: 0 0 4px; padding: 0; border: 0; }
+.meta { color: var(--muted); font-size: 14px; margin: 0 0 8px; }
+.item p { margin: 4px 0; }
+.brand { display: inline-flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; }
+footer.from { margin: 0 auto; padding: 0 16px 32px; color: var(--muted); font-size: 13px; text-align: center; }
+footer.from a { color: inherit; }
+
+label { display: block; font-weight: 600; margin: 20px 0 4px; }
+.hint { color: var(--muted); font-size: 14px; margin: 0 0 6px; font-weight: 400; }
+select, textarea, input[type=file] { font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; width: 100%; }
+select { width: auto; min-width: 280px; }
+textarea { min-height: 160px; resize: vertical; }
+button.primary { font: inherit; font-weight: 600; margin-top: 20px; padding: 8px 18px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
+button.primary:disabled { opacity: .6; cursor: default; }
+.status { margin: 12px 0 0; }
+.status.error { color: #9A3A0A; }
+.item pre { margin: 8px 0 0; max-height: 200px; }
+</style>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg width='24' height='28' role='img' aria-label='Senti' viewBox='0 0 96 110' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2349B5D2'%3E%3Cg transform='rotate(25 48 21)'%3E%3Crect x='46' y='9' width='4' height='12'/%3E%3Ccircle cx='48' cy='7' r='6'/%3E%3C/g%3E%3Cpath fill-rule='evenodd' d='M48 19.5a44.5 44.5 0 1 0 0.01 0Zm0 5a39.5 39.5 0 1 1 -0.01 0Z'/%3E%3Cpath fill-rule='evenodd' d='M27 62a21 21 0 1 0 42 0a21 21 0 1 0 -42 0ZM43.5 58a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0Z'/%3E%3Ccircle cx='49.5' cy='54.5' r='3'/%3E%3C/g%3E%3C/svg%3E">
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="brand" href="/" title="Senti: the suggestions"><svg width="24" height="28" role="img" aria-label="Senti" viewBox="0 0 96 110" xmlns="http://www.w3.org/2000/svg"><g fill="#49B5D2"><g transform="rotate(25 48 21)"><rect x="46" y="9" width="4" height="12"/><circle cx="48" cy="7" r="6"/></g><path fill-rule="evenodd" d="M48 19.5a44.5 44.5 0 1 0 0.01 0Zm0 5a39.5 39.5 0 1 1 -0.01 0Z"/><path fill-rule="evenodd" d="M27 62a21 21 0 1 0 42 0a21 21 0 1 0 -42 0ZM43.5 58a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0Z"/><circle cx="49.5" cy="54.5" r="3"/></g></svg><strong>Senti</strong></a>
+    <a href="/">Back to the suggestions</a>
+  </div>
+</header>
+<main>
+<h1>Add observation</h1>
+<p class="lead">Tell Senti something you have noticed on a service, such as an error you saw or a log file. Its analyst looks into it with the source code, and raises or updates a finding where there is something to fix.</p>
+<form id="form">
+  <label for="service">Service</label>
+  <select id="service" required></select>
+  <label for="instance">Instance <span class="hint">the installation where you noticed it</span></label>
+  <select id="instance" required></select>
+  <label for="text">What you noticed</label>
+  <p class="hint">What happened, when, and what you expected. Leave out passwords and other secrets.</p>
+  <textarea id="text" required></textarea>
+  <label for="file">Attach a file <span class="hint">optional, such as a log file</span></label>
+  <input type="file" id="file">
+  <p class="hint" id="file-note" hidden></p>
+  <button type="submit" class="primary" id="send">Add observation</button>
+  <p class="status" id="status" role="status"></p>
+</form>
+<h2 id="earlier-head">Earlier observations</h2>
+<p class="status" id="working" role="status" hidden></p>
+<div id="earlier"><p class="meta">Choose an instance.</p></div>
+</main>
+<footer class="from">Senti from <a href="https://www.tesobe.com">TESOBE</a> · <a href="https://github.com/TESOBE/Senti">Senti on GitHub</a></footer>
+<script>
+// What is shown comes from Senti's databases and from people: set as text, never as HTML.
+const ATTACHMENT_MAX_CHARS = 1000000;
+const el = (tag, props, children = []) => { const e = Object.assign(document.createElement(tag), props); e.append(...children); return e; };
+const $ = (id) => document.getElementById(id);
+const fmt = (ts) => ts ? new Date(ts * 1000).toLocaleString() : '';
+let instances = [];
+let attachment = null;  // {name, text}
+const FOLLOW_SECONDS = 5;  // how often the page looks again while the analyst is at work
+let followTimer = null, waitUntil = 0;  // after adding one, wait this long for its analysis to start
+const ago = (ts) => { const m = Math.round((Date.now() / 1000 - ts) / 60); return m < 1 ? 'just now' : `${m} min ago`; };
+
+function fillInstances(wanted) {
+  const service = $('service').value;
+  const mine = instances.filter((i) => i.service === service)
+    .sort((a, b) => (a.environment_rank - b.environment_rank) || a.name.localeCompare(b.name));
+  $('instance').replaceChildren(...mine.map((i) => el('option', { value: i.name, textContent: `${i.name} (${i.environment})`, selected: i.name === wanted })));
+  showEarlier();
+}
+
+async function showEarlier() {
+  const name = $('instance').value;
+  $('earlier-head').textContent = name ? `Earlier observations on ${name}` : 'Earlier observations';
+  if (!name) return $('earlier').replaceChildren(el('p', { className: 'meta', textContent: 'Choose an instance.' }));
+  history.replaceState(null, '', '/make-observation?instance=' + encodeURIComponent(name));
+  try {
+    const r = await fetch('/api/noticed?instance=' + encodeURIComponent(name));
+    const answer = await r.json();
+    if (!r.ok) throw new Error(answer.error || r.statusText);
+    if (name !== $('instance').value) return;
+    const list = answer.observations, running = answer.running;
+    const waiting = list.some((n) => !n.answered_at);
+    // While the analyst is at work on something unanswered, say what it is doing and look again
+    $('working').hidden = !(waiting && running);
+    if (waiting && running) $('working').textContent = `The analyst is at work, started ${ago(running.started_at)}.` + (running.step ? ` Now: ${running.step}` : '');
+    clearTimeout(followTimer);
+    if (waiting && (running || Date.now() < waitUntil)) followTimer = setTimeout(showEarlier, FOLLOW_SECONDS * 1000);
+    $('earlier').replaceChildren(...(list.length ? list.map((n) => el('div', { className: 'item' }, [
+      el('p', { className: 'meta', textContent: fmt(n.ts) + (n.attachment_chars ? ` · attached ${n.attachment_name || 'a file'} (${n.attachment_chars.toLocaleString()} characters)` : '') }),
+      el('p', { textContent: n.text }),
+      el('p', { className: 'meta', textContent: n.answered_at
+        ? `Looked into ${fmt(n.answered_at)}` + (n.finding_id ? ` · finding #${n.finding_id}: ${n.finding_title}` : ' · no finding') + `. ${n.answer}`
+        : 'Not looked into yet.' }),
+    ])) : [el('p', { className: 'meta', textContent: 'None yet.' })]));
+  } catch (e) {
+    $('earlier').replaceChildren(el('p', { className: 'meta', textContent: 'Could not read the earlier observations: ' + e.message }));
+  }
+}
+
+$('service').addEventListener('change', () => fillInstances());
+$('instance').addEventListener('change', () => { waitUntil = 0; showEarlier(); });
+$('file').addEventListener('change', async () => {
+  const file = $('file').files[0];
+  attachment = null;
+  $('file-note').hidden = true;
+  if (!file) return;
+  let text = await file.text();
+  if (text.length > ATTACHMENT_MAX_CHARS) {
+    text = text.slice(-ATTACHMENT_MAX_CHARS);
+    $('file-note').textContent = `The file is long, so only its last ${ATTACHMENT_MAX_CHARS.toLocaleString()} characters will be sent: the most recent lines of a log.`;
+    $('file-note').hidden = false;
+  }
+  attachment = { name: file.name, text };
+});
+
+$('form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const name = $('instance').value, text = $('text').value.trim();
+  $('status').className = 'status';
+  if (!name || !text) { $('status').textContent = 'Choose the service and instance, and say what you noticed.'; return; }
+  $('send').disabled = true;
+  $('status').textContent = 'Sending…';
+  try {
+    const r = await fetch('/api/noticed?instance=' + encodeURIComponent(name), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, attachment_name: attachment?.name ?? null, attachment: attachment?.text ?? null }) });
+    const answer = await r.json();
+    if (!r.ok) throw new Error(answer.error || r.statusText);
+    $('status').textContent = answer.not_started ? `Added. The analyst could not start now: ${answer.not_started}. It looks into it when it next runs.`
+      : answer.run_id ? 'Added. The analyst is looking into it now; its answer shows below when it has finished.'
+      : 'Added. An analysis is already running; the analyst looks into it straight after.';
+    $('text').value = ''; $('file').value = ''; attachment = null; $('file-note').hidden = true;
+    waitUntil = answer.not_started ? 0 : Date.now() + 60 * 1000;
+    showEarlier();
+  } catch (e) {
+    $('status').className = 'status error';
+    $('status').textContent = 'Could not add it: ' + e.message;
+  } finally {
+    $('send').disabled = false;
+  }
+});
+
+(async () => {
+  try {
+    instances = await fetch('/api/instances').then((r) => r.json());
+    const wanted = new URLSearchParams(location.search).get('instance');
+    const first = instances.find((i) => i.name === wanted) || instances[0];
+    const services = [...new Set(instances.map((i) => i.service))].sort();
+    $('service').replaceChildren(...services.map((s) => el('option', { value: s, textContent: s, selected: first && s === first.service })));
+    fillInstances(first?.name);
+  } catch (e) {
+    $('status').className = 'status error';
+    $('status').textContent = 'Could not read the services: ' + e.message;
+  }
+})();
+</script>
+</body>
+</html>

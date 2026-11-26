@@ -198,6 +198,18 @@ CREATE TABLE IF NOT EXISTS state (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+
+-- What a person noticed on this instance and told Senti (Add observation), and what the analyst made of it.
+CREATE TABLE IF NOT EXISTS noticed (
+    id              INTEGER PRIMARY KEY,
+    ts              INTEGER NOT NULL,
+    text            TEXT NOT NULL,         -- what the person noticed, in their words
+    attachment_name TEXT,                  -- the file they added, such as a log file
+    attachment      TEXT,
+    answered_at     INTEGER,               -- when the analyst looked into it
+    finding_id      INTEGER REFERENCES findings(id),  -- the finding it raised or updated, if any
+    answer          TEXT                   -- what the analyst found, in a sentence or two
+);
 """
 
 SAMPLES_PER_SIGNATURE = 5
@@ -442,6 +454,45 @@ class Store:
         if verdict == "dismissed":
             for signature_id in json.loads(finding["signature_ids"]):
                 self.set_signature_status(signature_id, "dismissed")
+
+    # --- what people noticed ------------------------------------------------------
+
+    def add_noticed(self, text: str, attachment_name: str | None = None, attachment: str | None = None) -> int:
+        """Record an observation from a person. The analyst looks into it on its next run."""
+        if not text.strip():
+            raise ValueError("Say what you noticed")
+        cur = self.db.execute("INSERT INTO noticed (ts, text, attachment_name, attachment) VALUES (?, ?, ?, ?)",
+                              (now(), text.strip(), attachment_name or None, attachment or None))
+        return cur.lastrowid
+
+    def noticed(self, unanswered_only: bool = False, limit: int = 50) -> list[sqlite3.Row]:
+        """Observations from people, newest first, without their attachments (see noticed_one)."""
+        where = "WHERE n.answered_at IS NULL" if unanswered_only else ""
+        return self.db.execute(
+            f"""SELECT n.id, n.ts, n.text, n.attachment_name, LENGTH(n.attachment) AS attachment_chars, n.answered_at,
+                       n.finding_id, n.answer, f.key AS finding_key, f.title AS finding_title
+                FROM noticed n LEFT JOIN findings f ON f.id = n.finding_id {where} ORDER BY n.id DESC LIMIT ?""",
+            (limit,)).fetchall()
+
+    def noticed_one(self, noticed_id: int) -> sqlite3.Row | None:
+        return self.db.execute("SELECT * FROM noticed WHERE id = ?", (noticed_id,)).fetchone()
+
+    def answer_noticed(self, noticed_id: int, answer: str, finding: str | None = None) -> None:
+        """Record what the analyst made of an observation: a sentence or two, and the finding (its id or key) it raised
+        or updated, if any."""
+        if not self.noticed_one(noticed_id):
+            raise ValueError(f"No observation with id {noticed_id}")
+        if not answer.strip():
+            raise ValueError("Say what you found")
+        finding_id = None
+        if finding:
+            row = self.db.execute("SELECT id FROM findings WHERE id = ? OR key = ?",
+                                  (int(finding) if finding.isdigit() else -1, finding)).fetchone()
+            if not row:
+                raise ValueError(f"No finding {finding}")
+            finding_id = row["id"]
+        self.db.execute("UPDATE noticed SET answered_at = ?, answer = ?, finding_id = ? WHERE id = ?",
+                        (now(), answer.strip(), finding_id, noticed_id))
 
     def undo_feedback(self, finding_id: int, within_seconds: int = UNDO_SECONDS) -> str:
         """Take back the latest feedback on a finding, given in the last `within_seconds`, and put the finding's

@@ -2,7 +2,7 @@
 
 Once when Senti starts, then every `analyse_minutes`, but only when it is worth it: enough hours watched,
 and something new since the last run (a new or rising signature, feedback from a person) or the last run is a
-day old. Otherwise the check is recorded and no tokens are spent.
+day old. An observation from a person (Add observation) is looked into on the next check, without waiting for data. Otherwise the check is recorded and no tokens are spent.
 
 Each run is `claude -p --agent senti-analyst --output-format stream-json`. Its steps (tool calls and
 short notes, never tool results) are stored in `analysis_steps` so the web page can show what it is doing.
@@ -84,10 +84,15 @@ def whats_new(store: Store, since: int) -> list[str]:
 def decide(store: Store, config: Config) -> tuple[bool, str]:
     """Whether to run now, and why (or why not), in words for the web page."""
     ts = now()
+    last = store.db.execute("SELECT MAX(started_at) FROM analysis_runs WHERE status = 'done'").fetchone()[0]
+    # What a person noticed is looked into without waiting for hours of data: they have seen something already
+    noticed = store.db.execute("SELECT COUNT(*) FROM noticed WHERE answered_at IS NULL AND ts > ?",
+                               (last or 0,)).fetchone()[0]
+    if noticed:
+        return True, f"{noticed} observation{'s' if noticed != 1 else ''} from a person"
     watched = watched_seconds(store, ts - 6 * 3600, ts, config.poll_seconds) / 3600
     if watched < config.analyse_min_watch_hours:
         return False, f"Waiting for data: {watched:.1f} of {config.analyse_min_watch_hours:g}h watched"
-    last = store.db.execute("SELECT MAX(started_at) FROM analysis_runs WHERE status = 'done'").fetchone()[0]
     if last is None:
         return True, "First analysis"
     if ts - last >= RERUN_ANYWAY_SECONDS:
@@ -98,7 +103,7 @@ def decide(store: Store, config: Config) -> tuple[bool, str]:
     return True, ", ".join(reasons)
 
 
-def _pid_alive(pid: int | None) -> bool:
+def pid_alive(pid: int | None) -> bool:
     if not pid:
         return False
     try:
@@ -115,7 +120,7 @@ def claim_run(store: Store, trigger: str) -> int | None:
     store.db.execute("BEGIN IMMEDIATE")
     try:
         for r in store.db.execute("SELECT id, pid FROM analysis_runs WHERE status = 'running'").fetchall():
-            if _pid_alive(r["pid"]):
+            if pid_alive(r["pid"]):
                 store.db.execute("ROLLBACK")
                 return None
             store.db.execute(
